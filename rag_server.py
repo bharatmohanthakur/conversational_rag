@@ -160,7 +160,7 @@ COLLECTION_NAME = os.getenv("QDRANT_COLLECTION", "docs_hybrid_azure_azadea_multi
 aoai_client = AzureOpenAI(
     api_key=AZURE_OPENAI_API_KEY,
     azure_endpoint=AZURE_OPENAI_ENDPOINT,
-    api_version="2024-02-01",
+    api_version=AZURE_OPENAI_API_VERSION,  # Use newer version for structured outputs
 )
 
 qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
@@ -1098,13 +1098,20 @@ async def greeting_detection_node(state: AgentState):
     ])
     
     try:
-        chain = prompt | agent_llm.with_structured_output(GreetingDetectionOutput)
-        result = await chain.ainvoke({"query": query})
-        
-        logger.info(f"Greeting detection: LLM result - is_greeting={result.is_greeting}, type={result.greeting_type}")
+        # Use JSON mode instead of structured output for compatibility
+        messages = prompt.format_messages(query=query)
+        response = await agent_llm.ainvoke(
+            messages + [("system", "Respond in JSON format with fields: is_greeting (boolean), greeting_type (string or null)")]
+        )
+
+        # Parse JSON response
+        import json
+        result_dict = json.loads(response.content)
+
+        logger.info(f"Greeting detection: LLM result - is_greeting={result_dict.get('is_greeting')}, type={result_dict.get('greeting_type')}")
         return {
-            "is_greeting": result.is_greeting,
-            "greeting_type": result.greeting_type
+            "is_greeting": result_dict.get("is_greeting", False),
+            "greeting_type": result_dict.get("greeting_type")
         }
     except Exception as e:
         logger.error(f"Error in greeting detection: {e}")
@@ -1209,9 +1216,16 @@ async def router_node(state: AgentState):
                    "- 'GENERIC' if the query is ambiguous, too broad, or MISSES CRITICAL CONTEXT (like Country/Location) causing the answer to vary (e.g., 'How many days maternity leave?', 'What are the travel allowances?', 'How can I benefit from insurance?'). These need clarification."),
         ("user", "{query}")
     ])
-    chain = prompt | agent_llm.with_structured_output(RouterOutput)
-    result = await chain.ainvoke({"query": query})
-    return {"complexity": result.complexity}
+    # Use JSON mode instead of structured output for compatibility
+    messages = prompt.format_messages(query=query)
+    response = await agent_llm.ainvoke(
+        messages + [("system", "Respond in JSON format with field: complexity (one of: SIMPLE, COMPLEX, FORMAT, GENERIC, DOC_PREFERENCE, CLARIFICATION_ANSWER)")]
+    )
+
+    # Parse JSON response
+    import json
+    result_dict = json.loads(response.content)
+    return {"complexity": result_dict.get("complexity", "SIMPLE")}
 
 # 2. Simple Handler (Direct RAG)
 class SimpleRAGOutput(BaseModel):
@@ -1300,9 +1314,24 @@ async def simple_rag_node(state: AgentState):
         messages.append(("user", user_content))
     else:
         messages.append(("user", f"Context:\n{context}\n\nQuestion: {query}"))
-        
-    chain = agent_llm.with_structured_output(SimpleRAGOutput)
-    result = await chain.ainvoke(messages)
+
+    # Use JSON mode instead of structured output for compatibility
+    messages_with_json_instruction = messages + [
+        ("system", "Respond in JSON format with fields: answer (string), status (ANSWERED or NEEDS_CLARIFICATION), missing_variables (array of strings)")
+    ]
+    response = await agent_llm.ainvoke(messages_with_json_instruction)
+
+    # Parse JSON response
+    import json
+    result_dict = json.loads(response.content)
+
+    # Create result object from dict
+    from types import SimpleNamespace
+    result = SimpleNamespace(
+        answer=result_dict.get("answer", ""),
+        status=result_dict.get("status", "ANSWERED"),
+        missing_variables=result_dict.get("missing_variables", [])
+    )
     
     if result.status == "NEEDS_CLARIFICATION":
         # Pass control to Clarifier node
@@ -1331,9 +1360,16 @@ async def decomposer_node(state: AgentState):
         ("system", "You are an expert planner. Break down the complex query into 2-4 distinct, simpler sub-queries that, when answered, will allow you to answer the main query comprehensively. Return ONLY the list of strings."),
         ("user", "{query}")
     ])
-    chain = prompt | agent_llm.with_structured_output(DecompositionOutput)
-    result = await chain.ainvoke({"query": query})
-    return {"sub_queries": result.sub_queries}
+    # Use JSON mode instead of structured output for compatibility
+    messages = prompt.format_messages(query=query)
+    response = await agent_llm.ainvoke(
+        messages + [("system", "Respond in JSON format with field: sub_queries (array of strings)")]
+    )
+
+    # Parse JSON response
+    import json
+    result_dict = json.loads(response.content)
+    return {"sub_queries": result_dict.get("sub_queries", [query])}
 
 # 4. Executor (Complex Path)
 async def executor_node(state: AgentState):
@@ -1403,9 +1439,11 @@ async def clarifier_node(state: AgentState):
     For GENERIC queries: Fetch initial RAG data, analyze what options/categories exist,
     and generate targeted clarifying questions based on available data.
     Now creates a clarification session to track context.
-    
+
     IMPORTANT: Questions are generated ONCE and stored in session. If session already exists,
     we reuse the existing questions instead of regenerating.
+
+    NOTE: This node handles clarification using simple LLM calls, not structured outputs.
     """
     query = state["original_query"]
     user_id = state["user_id"]
@@ -1553,29 +1591,40 @@ Example: If user asks "How can I benefit from insurance?" and context mentions h
 - Are you asking about coverage limits, enrollment process, or claim procedures?"""),
         ("user", f"User's generic question: {query}\n\nAvailable context from knowledge base:\n{context}\n\nGenerate clarifying questions:")
     ])
-    
-    chain = prompt | agent_llm.with_structured_output(ClarificationOutput)
-    result = await chain.ainvoke({"query": query, "context": context})
-    
+
+    # Use JSON mode instead of structured output for compatibility
+    messages = prompt.format_messages(query=query, context=context)
+    response = await agent_llm.ainvoke(
+        messages + [("system", "Respond in JSON format with fields: questions (array of strings), categories_found (array of strings)")]
+    )
+
+    # Parse JSON response
+    import json
+    result_dict = json.loads(response.content)
+
+    # Extract questions from response
+    questions = result_dict.get("questions", [])
+    categories_found = result_dict.get("categories_found", [])
+
     # Create clarification session to track this (ONCE - questions are fixed now)
     session = clarification_tracker.create_session(
         user_id=user_id,
         original_query=query,
-        questions=result.questions,  # These questions are now FIXED for this session
+        questions=questions,  # These questions are now FIXED for this session
         rag_context=context,
         sources=sources,
         metadata={"request_id": state.get("request_id")}
     )
-    
+
     # Format ALL clarifying questions as the response (first time)
-    questions_text = "\n".join([f"{i+1}. {q}" for i, q in enumerate(result.questions, start=1)])
+    questions_text = "\n".join([f"{i+1}. {q}" for i, q in enumerate(questions, start=1)])
     response_text = f"To help you better, I need a bit more information:\n\n{questions_text}\n\nPlease provide your answers and I'll give you a detailed response."
     
-    logger.info(f"Created NEW clarification session for {user_id} with {len(result.questions)} questions")
-    
+    logger.info(f"Created NEW clarification session for {user_id} with {len(questions)} questions")
+
     return {
         "final_answer": response_text,
-        "clarifying_questions": result.questions,
+        "clarifying_questions": questions,
         "awaiting_clarification": True,
         "rag_context_for_clarification": context,
         "sources": sources,
@@ -2174,15 +2223,26 @@ If this gave clarifying questions for a simple greeting, fix it with an appropri
         ])
     
     try:
-        chain = prompt | agent_llm.with_structured_output(AnswerRelevanceOutput)
-        result = await chain.ainvoke({"query": original_query, "answer": final_answer})
-        
-        if result.is_relevant:
-            logger.info(f"✅ Answer relevance check: ALIGNED - {result.relevance_reason[:100]}")
+        # Use JSON mode instead of structured output for compatibility
+        messages = prompt.format_messages(query=original_query, answer=final_answer)
+        response = await agent_llm.ainvoke(
+            messages + [("system", "Respond in JSON format with fields: is_relevant (boolean), relevance_reason (string), refined_answer (string if not relevant)")]
+        )
+
+        # Parse JSON response
+        import json
+        result_dict = json.loads(response.content)
+
+        is_relevant = result_dict.get("is_relevant", True)
+        relevance_reason = result_dict.get("relevance_reason", "")
+        refined_answer = result_dict.get("refined_answer", final_answer)
+
+        if is_relevant:
+            logger.info(f"✅ Answer relevance check: ALIGNED - {relevance_reason[:100]}")
             return state
         else:
-            logger.info(f"🔄 Answer relevance check: REFINED - {result.relevance_reason[:100]}")
-            return {"final_answer": result.refined_answer, "awaiting_clarification": False}
+            logger.info(f"🔄 Answer relevance check: REFINED - {relevance_reason[:100]}")
+            return {"final_answer": refined_answer, "awaiting_clarification": False}
             
     except Exception as e:
         logger.warning(f"⚠️ Answer relevance check failed, using original: {e}")

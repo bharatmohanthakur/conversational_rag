@@ -148,12 +148,15 @@ Respond in JSON format:
 If needs_decomposition is false, include the original query as a single sub-query with priority 1."""
 
         try:
+            # Use json_object format (compatible with all API versions)
             response = self.llm_client.chat.completions.create(
                 model=self.deployment_name,
-                messages=[{"role": "user", "content": prompt}],
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that responds in JSON format."},
+                    {"role": "user", "content": prompt}
+                ],
                 temperature=0.1,
-                max_tokens=500,
-                response_format={"type": "json_object"}
+                max_tokens=500
             )
             
             result_json = json.loads(response.choices[0].message.content)
