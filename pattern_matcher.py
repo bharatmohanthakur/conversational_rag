@@ -8,7 +8,6 @@ import logging
 from typing import List, Dict, Any, Optional, Set
 from enum import Enum
 from dataclasses import dataclass
-from config import get_query_processing_config
 
 logger = logging.getLogger("PatternMatcher")
 
@@ -51,7 +50,8 @@ class PatternMatcher:
 
     def __init__(self):
         """Initialize pattern matcher with default patterns."""
-        self.config = get_query_processing_config()
+        # Note: Patterns are hardcoded here for now to avoid circular dependencies
+        # These can be made configurable via environment variables later
 
         # Greeting patterns
         self.greeting_patterns = {
@@ -339,14 +339,15 @@ class PatternMatcher:
             return QueryComplexity.MODERATE
 
         # Check simple patterns
+        simple_query_max_words = 15  # Default threshold
         for pattern in self.complexity_indicators["simple"]:
             if re.search(pattern, query_lower):
-                if word_count <= self.config.simple_query_max_words:
+                if word_count <= simple_query_max_words:
                     logger.debug(f"Query classified as SIMPLE (pattern: {pattern}, words: {word_count})")
                     return QueryComplexity.SIMPLE
 
         # Default: simple if short, moderate if longer
-        if word_count <= self.config.simple_query_max_words:
+        if word_count <= simple_query_max_words:
             return QueryComplexity.SIMPLE
         else:
             return QueryComplexity.MODERATE
@@ -377,7 +378,9 @@ class PatternMatcher:
         query_lower = query.lower().strip()
         first_words = query_lower.split()[:2]
 
-        question_words = self.config.new_question_starters
+        # Default question starters (can be made configurable later)
+        question_words = ["what", "how", "when", "where", "who", "why",
+                         "can", "is", "are", "do", "does", "will", "would", "should"]
         return any(word in first_words for word in question_words)
 
 
