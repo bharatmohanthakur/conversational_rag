@@ -9,6 +9,8 @@ from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from dataclasses import dataclass, asdict
 from enum import Enum
+from config import get_clarification_config
+from pattern_matcher import get_pattern_matcher
 
 logger = logging.getLogger("ClarificationTracker")
 
@@ -52,8 +54,11 @@ class ClarificationSession:
         self.updated_at = datetime.now().isoformat()
         logger.info(f"Added answer to question {question_index}: {answer[:50]} (turn {self.turn_count})")
     
-    def has_reached_max_turns(self, max_turns: int = 3) -> bool:
+    def has_reached_max_turns(self, max_turns: int = None) -> bool:
         """Check if clarification has reached maximum turns."""
+        if max_turns is None:
+            from config import get_clarification_config
+            max_turns = get_clarification_config().max_turns
         return self.turn_count >= max_turns
     
     def is_complete(self) -> bool:
@@ -92,12 +97,14 @@ class ClarificationTracker:
     def __init__(self, conversation_manager):
         """
         Initialize clarification tracker.
-        
+
         Args:
             conversation_manager: ConversationManager instance for storage
         """
         self.conv_manager = conversation_manager
         self.active_sessions: Dict[str, ClarificationSession] = {}  # user_id -> session
+        self.config = get_clarification_config()
+        self.pattern_matcher = get_pattern_matcher()
     
     def create_session(
         self,
@@ -160,12 +167,14 @@ class ClarificationTracker:
             session = self.active_sessions[user_id]
             # Check if still valid (not too old, not abandoned)
             if session.status == ClarificationStatus.AWAITING.value:
-                # Check age (abandon if older than 30 minutes)
+                # Check age (abandon if older than configured timeout)
                 created = datetime.fromisoformat(session.created_at)
-                if datetime.now() - created < timedelta(minutes=30):
+                timeout = timedelta(minutes=self.config.session_timeout_minutes)
+                if datetime.now() - created < timeout:
                     return session
                 else:
                     # Session expired
+                    logger.info(f"Session expired for {user_id} (timeout: {self.config.session_timeout_minutes} minutes)")
                     session.status = ClarificationStatus.ABANDONED.value
                     self._save_session(session)
                     del self.active_sessions[user_id]
@@ -241,10 +250,11 @@ class ClarificationTracker:
             data = json.dumps(session.to_dict(), ensure_ascii=False)
             
             if self.conv_manager.redis_client:
-                # Save to Redis with 1 hour TTL
+                # Save to Redis with configurable TTL
+                ttl = timedelta(minutes=self.config.session_timeout_minutes)
                 self.conv_manager.redis_client.setex(
                     key,
-                    timedelta(hours=1),
+                    ttl,
                     data
                 )
             else:
@@ -279,77 +289,74 @@ class ClarificationTracker:
     def is_clarification_response(self, user_id: str, query: str) -> bool:
         """
         Detect if a user query is likely answering a clarifying question.
-        
+        Uses pattern matcher for more robust detection.
+
         Args:
             user_id: User identifier
             query: User's query
-        
+
         Returns:
             True if likely a clarification answer
         """
         session = self.get_active_session(user_id)
         if not session:
             return False
-        
+
         if session.status != ClarificationStatus.AWAITING.value:
             return False
-        
-        # Check if query is actually answering clarification questions
-        # If query looks like a new question (contains question words, is too long, etc.), it's NOT a clarification answer
+
         query_lower = query.lower().strip()
-        
-        # New question indicators (NOT a clarification answer):
-        # - Contains question words at start: "what", "how", "when", "where", "who", "why", "can", "is", "are", "do", "does"
-        # - Is a greeting: "hi", "hello", "hey", "thanks", "thank you"
-        # - Is too long (likely a new question, not a short answer)
-        question_starters = ["what", "how", "when", "where", "who", "why", "can", "is", "are", "do", "does", "will", "would", "should"]
-        greeting_words = ["hi", "hello", "hey", "thanks", "thank you", "okay", "ok", "sure"]
-        
-        # Check if starts with question word or greeting
-        first_words = query_lower.split()[:2]  # First 2 words
-        if any(word in first_words for word in question_starters):
-            # This looks like a new question, not a clarification answer
+        word_count = len(query.split())
+
+        # Use pattern matcher for more accurate detection
+        # Check if it's a new question
+        if self.pattern_matcher.starts_with_question_word(query):
             logger.info(f"Query '{query[:50]}' looks like a new question (starts with question word), not a clarification answer")
             return False
-        
-        if any(word in first_words for word in greeting_words):
-            # This is a greeting, not a clarification answer
-            logger.info(f"Query '{query[:50]}' is a greeting, not a clarification answer")
+
+        # Check if it's a greeting/casual (using pattern matcher)
+        if self.pattern_matcher.is_greeting_or_casual(query):
+            logger.info(f"Query '{query[:50]}' is a greeting/casual message, not a clarification answer")
             return False
-        
-        # If query is very long (>50 words), it's likely a new question, not a short clarification answer
-        if len(query.split()) > 50:
-            logger.info(f"Query '{query[:50]}' is too long ({len(query.split())} words), likely a new question")
+
+        # Check length constraints
+        if word_count < self.config.min_answer_length:
+            logger.info(f"Query '{query[:50]}' is too short ({word_count} words), treating as clarification answer anyway")
+            return True
+
+        if word_count > self.config.max_answer_length:
+            logger.info(f"Query '{query[:50]}' is too long ({word_count} words), likely a new question")
             return False
-        
+
         # Otherwise, if there's an active session awaiting answers, treat as clarification answer
+        logger.info(f"Query '{query[:50]}' treated as clarification answer (word count: {word_count})")
         return True
     
     def detect_user_frustration(self, user_id: str, query: str) -> bool:
         """
         Detect if user is frustrated or wants to proceed without providing all answers.
-        
+        Uses configurable frustration signals.
+
         Args:
             user_id: User identifier
             query: User's query
-        
+
         Returns:
             True if frustration detected
         """
         session = self.get_active_session(user_id)
         if not session:
             return False
-        
+
         query_lower = query.lower().strip()
-        
-        # Frustration signals
-        frustration_signals = [
-            "just tell me", "any", "i don't know", "i don't care", "whatever",
-            "doesn't matter", "not important", "skip", "proceed", "continue",
-            "just give me", "any is fine", "doesn't matter", "i don't mind"
-        ]
-        
-        return any(signal in query_lower for signal in frustration_signals)
+
+        # Use configured frustration signals
+        detected = any(signal in query_lower for signal in self.config.frustration_signals)
+
+        if detected:
+            logger.info(f"User frustration detected in query: {query[:50]}")
+
+        return detected
     
     def detect_comprehensive_answer(self, user_id: str, query: str) -> bool:
         """
