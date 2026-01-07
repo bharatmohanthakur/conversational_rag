@@ -1051,153 +1051,195 @@ class GreetingDetectionOutput(BaseModel):
 async def greeting_detection_node(state: AgentState):
     """
     Detect if the user query is a greeting, casual message, or emotional expression.
-    Uses fast pattern matching first, then LLM for edge cases.
+    Uses LLM with Chain of Thought reasoning for ALL detection (no hardcoded patterns).
     """
     query = state["original_query"]
     user_id = state["user_id"]
-    
-    # Fast path: Check for obvious greetings first (before checking clarification sessions)
-    query_lower = query.lower().strip()
-    obvious_greetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening", 
-                         "thanks", "thank you", "okay", "ok", "sure", "great", "awesome", "perfect"]
-    is_obvious_greeting = any(greeting == query_lower or query_lower.startswith(greeting + " ") 
-                             for greeting in obvious_greetings) and len(query.split()) <= 5
-    
-    # If it's an obvious greeting, abandon any clarification session and return immediately
-    if is_obvious_greeting:
-        active_session = clarification_tracker.get_active_session(user_id)
-        if active_session:
-            clarification_tracker.abandon_session(user_id)
-            logger.info(f"Greeting detection: Abandoned clarification session for obvious greeting")
-        logger.info(f"Greeting detection: Fast path - obvious greeting detected")
-        greeting_type = "greeting" if any(g in query_lower for g in ["hi", "hello", "hey", "good"]) else "casual"
-        return {
-            "is_greeting": True,
-            "greeting_type": greeting_type
-        }
-    
+
     # Skip if there's an active clarification session (don't treat clarification answers as greetings)
-    # But only if it's NOT an obvious greeting (we already handled that above)
     active_session = clarification_tracker.get_active_session(user_id)
     if active_session:
         logger.info(f"Greeting detection: Active clarification session, skipping greeting check")
         return {"is_greeting": False}
-    
-    # Use pattern matching for other greetings (no LLM call needed)
-    is_greeting_pattern = is_greeting_or_casual(query)
-    if is_greeting_pattern:
-        logger.info(f"Greeting detection: Pattern matching detected greeting")
-        return {"is_greeting": True, "greeting_type": "greeting"}
-    
-    # Only use LLM for ambiguous cases (queries that might be greetings or questions)
+
+    # Use LLM with Chain of Thought for ALL greeting detection
     prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a greeting detection expert. Use step-by-step reasoning to classify messages.\n\n"
-                   "**STEP 1 - CHAIN OF THOUGHT ANALYSIS:**\n"
-                   "Think through these questions:\n\n"
-                   "1. Message intent analysis:\n"
-                   "   - Is this ONLY a greeting/thanks/casual? (hi, hello, thanks, okay)\n"
-                   "   - Does it contain an actual HR question after the greeting?\n"
-                   "   - What is the PRIMARY purpose of this message?\n\n"
-                   "2. Structure analysis:\n"
-                   "   - Single greeting word: 'Hi' → likely greeting\n"
-                   "   - Greeting + question: 'Hi, what's the policy?' → HR QUERY (not greeting)\n"
-                   "   - Pure thanks: 'Thanks' → casual/greeting\n"
-                   "   - Thanks + question: 'Thanks, but how about...' → HR QUERY\n\n"
-                   "3. Classification rules:\n"
-                   "   - If message contains question words (what, how, when, where) → likely HR QUERY\n"
-                   "   - If message is 1-2 words and matches greeting/thanks → GREETING\n"
-                   "   - If greeting is just an opener followed by real question → HR QUERY (is_greeting=false)\n\n"
-                   "**STEP 2 - FINAL CLASSIFICATION:**\n"
-                   "Based on your analysis:\n\n"
-                   "Greeting/Casual examples (is_greeting=true):\n"
-                   "- 'Hello', 'Hi', 'Good morning', 'Hey'\n"
-                   "- 'Thanks', 'Thank you', 'Okay', 'Sure'\n"
-                   "- 'Great', 'Awesome', 'Perfect'\n\n"
-                   "HR Query examples (is_greeting=false):\n"
-                   "- 'What is the leave policy?'\n"
-                   "- 'Hi, what is the leave policy?' (greeting is just opener)\n"
-                   "- 'Thanks, but how do I apply for leave?' (thanks is transition)\n"
-                   "- 'Tell me about insurance'\n\n"
-                   "CRITICAL: If the message has a real HR question, set is_greeting=false even if it starts with hi/thanks"),
+        ("system", """You are a greeting detection expert. Use step-by-step reasoning to classify messages.
+
+**STEP 1 - CHAIN OF THOUGHT ANALYSIS:**
+Think through these questions:
+
+1. Message intent analysis:
+   - Is this ONLY a greeting/thanks/casual? (hi, hello, thanks, okay)
+   - Does it contain an actual HR question after the greeting?
+   - What is the PRIMARY purpose of this message?
+
+2. Structure analysis:
+   - Single greeting word: 'Hi' → likely greeting
+   - Greeting + question: 'Hi, what's the policy?' → HR QUERY (not greeting)
+   - Pure thanks: 'Thanks' → casual/greeting
+   - Thanks + question: 'Thanks, but how about...' → HR QUERY
+   - Short acknowledgment: 'okay', 'sure', 'got it' → casual/greeting
+   - Emotional expressions: 'I'm stressed', 'feeling anxious' → emotional/greeting
+
+3. Question detection:
+   - Does it contain question words? (what, how, when, where, why, who, which)
+   - Does it contain HR keywords? (leave, policy, salary, benefits, insurance, vacation)
+   - If YES to either → likely HR QUERY, not greeting
+
+4. Classification rules:
+   - If message is 1-3 words without HR content → GREETING
+   - If greeting is just an opener followed by real question → HR QUERY (is_greeting=false)
+   - Standalone emotional expressions without questions → GREETING (offer support)
+   - "Thanks" or acknowledgment alone → GREETING
+   - Any actual HR question → NOT greeting (even if starts with "hi")
+
+**STEP 2 - GREETING TYPE IDENTIFICATION:**
+If this IS a greeting (is_greeting=true), determine type:
+- "greeting": Hi, hello, good morning, hey
+- "gratitude": Thanks, thank you
+- "acknowledgment": Okay, sure, got it, alright
+- "appreciation": Great, awesome, perfect
+- "emotional": Expressing feelings (lonely, stressed, happy, confused)
+- "farewell": Bye, goodbye, see you
+
+**STEP 3 - FINAL CLASSIFICATION:**
+Based on your analysis, provide:
+
+Greeting/Casual examples (is_greeting=true):
+- 'Hello', 'Hi', 'Good morning', 'Hey' → greeting_type: "greeting"
+- 'Thanks', 'Thank you' → greeting_type: "gratitude"
+- 'Okay', 'Sure', 'Got it' → greeting_type: "acknowledgment"
+- 'Great', 'Awesome', 'Perfect' → greeting_type: "appreciation"
+- 'I'm feeling stressed' → greeting_type: "emotional"
+- 'Bye', 'Goodbye' → greeting_type: "farewell"
+
+HR Query examples (is_greeting=false):
+- 'What is the leave policy?' → not greeting
+- 'Hi, what is the leave policy?' → greeting is just opener, NOT greeting
+- 'Thanks, but how do I apply for leave?' → thanks is transition, NOT greeting
+- 'Tell me about insurance' → not greeting
+- 'How many vacation days?' → not greeting
+
+CRITICAL: If the message has a real HR question, set is_greeting=false even if it starts with hi/thanks"""),
         ("user", "{query}")
     ])
-    
+
     try:
         # Use JSON mode instead of structured output for compatibility
         messages = prompt.format_messages(query=query)
         response = await agent_llm.ainvoke(
-            messages + [("system", "Respond in JSON format with fields: is_greeting (boolean), greeting_type (string or null)")]
+            messages + [("system", "Respond in JSON format with fields: is_greeting (boolean), greeting_type (string: greeting|gratitude|acknowledgment|appreciation|emotional|farewell or null)")]
         )
 
         # Parse JSON response
         import json
         result_dict = json.loads(response.content)
 
-        logger.info(f"Greeting detection: LLM result - is_greeting={result_dict.get('is_greeting')}, type={result_dict.get('greeting_type')}")
+        is_greeting_result = result_dict.get("is_greeting", False)
+        greeting_type_result = result_dict.get("greeting_type")
+
+        # If LLM detected a greeting, check if we need to abandon clarification session
+        if is_greeting_result:
+            active_session = clarification_tracker.get_active_session(user_id)
+            if active_session:
+                clarification_tracker.abandon_session(user_id)
+                logger.info(f"Greeting detection: Abandoned clarification session - LLM detected greeting")
+
+        logger.info(f"Greeting detection: LLM result - is_greeting={is_greeting_result}, type={greeting_type_result}")
         return {
-            "is_greeting": result_dict.get("is_greeting", False),
-            "greeting_type": result_dict.get("greeting_type")
+            "is_greeting": is_greeting_result,
+            "greeting_type": greeting_type_result
         }
     except Exception as e:
-        logger.error(f"Error in greeting detection: {e}")
-        # Final fallback: use pattern matching
-        is_greeting = is_greeting_or_casual(query)
-        return {"is_greeting": is_greeting}
+        logger.error(f"Error in greeting detection LLM: {e}")
+        # Minimal fallback: assume not greeting on error to avoid blocking real queries
+        return {"is_greeting": False, "greeting_type": None}
 
 # 0b. Greeting Response Node
 async def greeting_response_node(state: AgentState):
     """
-    Generate a friendly greeting response for greetings, casual messages, or emotional expressions.
+    Generate a friendly greeting response using LLM with Chain of Thought reasoning.
     Greetings should NEVER create clarification sessions.
-    Uses fast template responses for common greetings, LLM only for complex cases.
+    ALL responses are LLM-generated for natural, context-aware interactions.
     """
     query = state["original_query"]
     user_id = state["user_id"]
     greeting_type = state.get("greeting_type", "greeting")
-    
+
     # Explicitly abandon any active clarification session for greetings
     # Greetings are not clarification answers and should not create sessions
     active_session = clarification_tracker.get_active_session(user_id)
     if active_session:
         clarification_tracker.abandon_session(user_id)
         logger.info(f"Abandoned clarification session for {user_id} - greeting detected")
-    
-    # Fast path: Use template responses for common greetings (no LLM call)
-    query_lower = query.lower().strip()
-    
-    # Template responses for common greetings (instant, no LLM)
-    if query_lower in ["hi", "hello", "hey"]:
+
+    # Get conversation history for context-aware responses
+    conversation_history = conversation_manager.get_history(user_id, limit=5)
+    history_context = ""
+    if conversation_history:
+        recent_topics = []
+        for msg in conversation_history[-3:]:  # Last 3 messages
+            if msg["role"] == "user" and msg["content"].lower() not in ["hi", "hello", "thanks", "thank you"]:
+                recent_topics.append(msg["content"][:50])
+
+        if recent_topics:
+            history_context = f"\n\nRecent conversation topics: {', '.join(recent_topics)}"
+
+    # Use LLM with Chain of Thought for ALL greeting responses
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", """You are a friendly HR assistant chatbot. Use step-by-step reasoning to craft the perfect greeting response.
+
+**STEP 1 - CHAIN OF THOUGHT ANALYSIS:**
+Think through these questions:
+
+1. Message intent analysis:
+   - Is this a greeting? (hi, hello, good morning)
+   - Is this gratitude? (thanks, thank you)
+   - Is this acknowledgment? (okay, sure, got it)
+   - Is this appreciation? (great, awesome, perfect)
+   - Is this a farewell? (bye, goodbye, see you)
+
+2. Conversation context:
+   - Is there recent conversation history?
+   - Did we just help with something specific?
+   - Is this the start of a new conversation?
+
+3. Emotional tone:
+   - Is the user formal or casual?
+   - Are they expressing positive emotion?
+   - Are they neutral or just being polite?
+
+4. Appropriate response:
+   - Should I greet back warmly?
+   - Should I acknowledge their thanks?
+   - Should I say goodbye?
+   - Should I reference what we just discussed?
+   - Should I offer further help?
+
+**STEP 2 - RESPONSE GENERATION:**
+Based on your analysis, generate a warm, professional response that:
+- Matches the user's tone and formality level
+- Is brief (1-2 sentences maximum)
+- Feels natural and human-like
+- Offers to help with HR questions (for greetings)
+- Acknowledges gratitude warmly (for thanks)
+- References recent context if relevant
+- Uses conversational language, not robotic
+
+CRITICAL: Keep it SHORT and NATURAL. No corporate jargon."""),
+        ("user", f"User message: {query}{history_context}")
+    ])
+
+    try:
+        response = await agent_llm.ainvoke(prompt.format_messages())
+        greeting_response = response.content
+        logger.info(f"Generated LLM greeting response: {greeting_response[:100]}")
+    except Exception as e:
+        logger.error(f"Error generating greeting response: {e}")
+        # Fallback to simple response only on error
         greeting_response = "Hello! How can I help you with your HR questions today?"
-    elif "good morning" in query_lower:
-        greeting_response = "Good morning! How can I assist you with your HR questions today?"
-    elif "good afternoon" in query_lower:
-        greeting_response = "Good afternoon! How can I help you with your HR questions today?"
-    elif "good evening" in query_lower:
-        greeting_response = "Good evening! How can I assist you with your HR questions today?"
-    elif "thanks" in query_lower or "thank you" in query_lower:
-        greeting_response = "You're welcome! Is there anything else I can help you with?"
-    elif query_lower in ["okay", "ok", "sure"]:
-        greeting_response = "Great! How can I assist you with your HR questions?"
-    elif query_lower in ["great", "awesome", "perfect"]:
-        greeting_response = "I'm glad I could help! Is there anything else you'd like to know?"
-    else:
-        # Use LLM only for complex/ambiguous greetings
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are a friendly HR assistant chatbot. Respond warmly and professionally to greetings, "
-                       "casual messages, or emotional expressions. Keep responses brief (1-2 sentences). "
-                       "If the user says thank you or expresses appreciation, acknowledge it warmly. "
-                       "If it's a greeting, greet them back and offer to help with HR questions."),
-            ("user", "{query}")
-        ])
-        
-        try:
-            response = await agent_llm.ainvoke([("system", prompt.messages[0].content), ("user", query)])
-            greeting_response = response.content
-            logger.info(f"Generated greeting response via LLM: {greeting_response[:100]}")
-        except Exception as e:
-            logger.error(f"Error generating greeting response: {e}")
-            greeting_response = "Hello! How can I help you with your HR questions today?"
-    
+
     return {
         "final_answer": greeting_response,
         "sources": [],
