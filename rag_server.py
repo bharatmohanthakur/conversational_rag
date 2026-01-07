@@ -2383,9 +2383,9 @@ async def clarifier_node(state: AgentState):
         missing = existing_session.get_missing_questions()
         
         if missing:
-            # Show remaining questions
+            # Show remaining questions - use bullets for conversational consistency
             remaining_questions = [questions[i] for i in missing]
-            questions_text = "\n".join([f"{i+1}. {q}" for i, q in enumerate(remaining_questions, start=1)])
+            questions_text = "\n".join([f"- {q}" for q in remaining_questions])  # Bullets, not numbers
             response_text = (
                 f"I still need a bit more information:\n\n{questions_text}\n\n"
                 f"Please provide your answers."
@@ -2718,10 +2718,10 @@ async def clarification_answer_handler_node(state: AgentState):
     # Not enough info yet - ask remaining questions
     missing = session.get_missing_questions()
     remaining_questions = [session.questions_asked[i] for i in missing]
-    
+
     if remaining_questions:
-        questions_text = "\n".join([f"{i+1}. {q}" for i, q in enumerate(remaining_questions, start=1)])
-        response_text = f"To help you better, I need a bit more information:\n\n{questions_text}\n\nPlease provide your answers and I'll give you a detailed response."
+        questions_text = "\n".join([f"- {q}" for q in remaining_questions])  # Bullets, not numbers
+        response_text = f"I still need a bit more information:\n\n{questions_text}\n\nPlease provide your answers."
         
         return {
             "final_answer": response_text,
