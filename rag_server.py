@@ -1471,7 +1471,40 @@ async def executor_node(state: AgentState):
         context_str = search_result["context"]
         all_sources.extend(search_result["sources"])
         answers.append(f"### Q: {q}\n{context_str}")
-        
+
+    # PRIORITY 1: Check for mixed document types in aggregated sources
+    workflow_sources = [s for s in all_sources if " - W " in s.get("source", "") or " - W-" in s.get("source", "")]
+    normal_sources = [s for s in all_sources if s not in workflow_sources]
+
+    has_workflow = len(workflow_sources) > 0
+    has_normal = len(normal_sources) > 0
+
+    if has_workflow and has_normal:
+        workflow_docs = list(set([s["source"] for s in workflow_sources]))
+        normal_docs = list(set([s["source"] for s in normal_sources]))
+
+        logger.info(f"📋 Mixed docs detected in EXECUTOR - Prompting user immediately")
+        response_text = (
+            "I found relevant information from both **workflow documents** and **policy/guideline documents**.\n\n"
+            f"**Workflow Documents** (step-by-step procedures):\n" +
+            "\n".join([f"- {doc}" for doc in workflow_docs[:3]]) + "\n\n"
+            f"**Policy/Guideline Documents**:\n" +
+            "\n".join([f"- {doc}" for doc in normal_docs[:3]]) + "\n\n"
+            "Which type would you prefer?\n"
+            "1. **Workflow** - Detailed step-by-step process\n"
+            "2. **Policy/Guideline** - General rules and information\n"
+            "3. **Both** - Combined information from all sources\n\n"
+            "Please reply with your preference (e.g., 'workflow', 'policy', or 'both')."
+        )
+        # Return immediately with document preference prompt
+        return {
+            "final_answer": response_text,
+            "sources": all_sources,
+            "awaiting_clarification": True,
+            "clarifying_questions": ["Document type preference: workflow, policy, or both?"],
+            "complexity": "DOC_PREFERENCE"
+        }
+
     return {"sub_answers": answers, "sources": all_sources}
 
 # 5. Synthesizer (Complex Path)
@@ -1678,7 +1711,60 @@ async def clarifier_node(state: AgentState):
         search_result = await run_search_for_deep_agent(query, user_id)
         context = search_result["context"]
         sources = search_result["sources"]
-    
+
+    # PRIORITY 1: Check for mixed document types - prompt user immediately
+    workflow_sources = [s for s in sources if " - W " in s.get("source", "") or " - W-" in s.get("source", "")]
+    normal_sources = [s for s in sources if s not in workflow_sources]
+
+    has_workflow = len(workflow_sources) > 0
+    has_normal = len(normal_sources) > 0
+
+    if has_workflow and has_normal:
+        workflow_docs = list(set([s["source"] for s in workflow_sources]))
+        normal_docs = list(set([s["source"] for s in normal_sources]))
+
+        logger.info(f"📋 Mixed docs detected in CLARIFIER - Prompting user immediately")
+        response_text = (
+            "I found relevant information from both **workflow documents** and **policy/guideline documents**.\n\n"
+            f"**Workflow Documents** (step-by-step procedures):\n" +
+            "\n".join([f"- {doc}" for doc in workflow_docs[:3]]) + "\n\n"
+            f"**Policy/Guideline Documents**:\n" +
+            "\n".join([f"- {doc}" for doc in normal_docs[:3]]) + "\n\n"
+            "Which type would you prefer?\n"
+            "1. **Workflow** - Detailed step-by-step process\n"
+            "2. **Policy/Guideline** - General rules and information\n"
+            "3. **Both** - Combined information from all sources\n\n"
+            "Please reply with your preference (e.g., 'workflow', 'policy', or 'both')."
+        )
+        return {
+            "final_answer": response_text,
+            "sources": sources,
+            "awaiting_clarification": True,
+            "clarifying_questions": ["Document type preference: workflow, policy, or both?"]
+        }
+
+    # PRIORITY 2: Check if any document has >85% filename similarity (score > 10.0)
+    high_filename_matches = [s for s in sources if s.get("score", 0) > 10.0]
+    if high_filename_matches:
+        # High filename match found - bypass clarification, show results directly
+        logger.info(f"🎯 High filename similarity match (>85%) in CLARIFIER - Bypassing clarification questions")
+        sources = high_filename_matches
+        context = "\n".join([s.get("text_snippet", "") for s in sources[:7]])
+
+        # Generate direct answer instead of clarification questions
+        messages = [
+            ("system", "You are a helpful HR assistant. Answer directly based on the provided context."),
+            ("user", f"Context:\n{context}\n\nQuestion: {query}\n\nProvide a direct answer based on the context.")
+        ]
+        response = await agent_llm.ainvoke(messages)
+        answer_text = response.content
+
+        return {
+            "final_answer": answer_text,
+            "sources": sources,
+            "awaiting_clarification": False
+        }
+
     # Generate clarifying questions based on what's in the data (ONCE)
     prompt = ChatPromptTemplate.from_messages([
         ("system", """You are an HR assistant helping to clarify a user's generic question.
