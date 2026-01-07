@@ -2159,15 +2159,20 @@ async def decomposer_node(state: AgentState):
 async def executor_node(state: AgentState):
     sub_queries = state["sub_queries"]
     user_id = state["user_id"]
+
+    # Run ALL sub-query searches in PARALLEL for maximum performance
+    logger.info(f"🚀 Executing {len(sub_queries)} sub-queries in PARALLEL")
+    search_tasks = [run_search_for_deep_agent(q, user_id) for q in sub_queries]
+    search_results = await asyncio.gather(*search_tasks)
+
+    # Process results
     answers = []
     all_sources = []
-    
-    # Run searches in sequence (to not overload API)
-    for q in sub_queries:
-        search_result = await run_search_for_deep_agent(q, user_id)
+    for i, (q, search_result) in enumerate(zip(sub_queries, search_results)):
         context_str = search_result["context"]
         all_sources.extend(search_result["sources"])
         answers.append(f"### Q: {q}\n{context_str}")
+        logger.info(f"✓ Sub-query {i+1}/{len(sub_queries)} completed: {q[:50]}")
 
     # PRIORITY 1: Check for mixed document types in aggregated sources
     workflow_sources = [s for s in all_sources if " - W " in s.get("source", "") or " - W-" in s.get("source", "")]
