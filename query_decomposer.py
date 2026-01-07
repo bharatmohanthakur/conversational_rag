@@ -113,34 +113,54 @@ class QueryDecomposer:
         logger.info(f"Query decomposition check (may need decomposition): {query[:50]}")
         
         # Use LLM to determine if decomposition is needed and generate sub-queries
-        prompt = f"""Analyze the following query and determine if it should be decomposed into multiple sub-queries.
+        prompt = f"""Analyze the following query and determine if it should be decomposed using step-by-step reasoning.
 
-IMPORTANT: Only decompose if the query has MULTIPLE DISTINCT, SEPARATE questions or topics that require different retrieval strategies.
+**STEP 1 - CHAIN OF THOUGHT ANALYSIS:**
+Think through these questions:
 
-A query should be decomposed ONLY if it:
-1. Explicitly asks about multiple DISTINCT topics (e.g., "What is X and how does Y work?")
-2. Requires comparing different entities (e.g., "Compare X vs Y")
-3. Has clear multiple parts with conjunctions AND each part is a separate question
-4. Asks for a list of items with DIFFERENT criteria that need separate searches
+1. Query structure analysis:
+   - How many DISTINCT, SEPARATE questions or topics are there?
+   - Does "and" or "or" join multiple separate questions OR parts of one question?
+   - Is this asking about one thing with multiple aspects OR multiple different things?
 
-DO NOT decompose if:
-- The query is a single question, even if it mentions multiple things
-- The query uses "and" or "or" but is asking one unified question
-- The query is simple and can be answered with one search
-- The query is about one topic with multiple aspects (these should be handled by the retrieval system)
+2. Retrieval strategy check:
+   - Would different parts require DIFFERENT retrieval strategies?
+   - Can this be answered with ONE search OR need MULTIPLE searches?
+   - Are we comparing entities that need separate lookups?
+
+3. Examples for reference:
+   - "What is the leave policy and insurance?" → DECOMPOSE (2 distinct topics)
+   - "Compare sick leave vs annual leave" → DECOMPOSE (comparison needs separate lookups)
+   - "What is the leave policy for managers?" → NO (single unified question)
+   - "Tell me about leave and how to apply" → NO (one topic, multiple aspects)
+
+4. Decision criteria:
+   Decompose ONLY if:
+   - Multiple DISTINCT topics requiring separate searches
+   - Comparison between different entities
+   - Clear multiple separate questions joined by conjunctions
+   - List with DIFFERENT criteria needing separate searches
+
+   DO NOT decompose if:
+   - Single question mentioning multiple things
+   - "and"/"or" used in one unified question
+   - Simple question answerable with one search
+   - One topic with multiple aspects
+
+**STEP 2 - DECOMPOSITION DECISION:**
 
 Query: {query}
 {f"Context: {context}" if context else ""}
 
-Respond in JSON format:
+Based on your analysis, respond in JSON format:
 {{
     "needs_decomposition": true/false,
-    "reasoning": "brief explanation of why decomposition is or isn't needed",
+    "reasoning": "brief explanation based on your step-by-step thinking",
     "sub_queries": [
         {{
             "query": "focused sub-query",
-            "intent": "what this sub-query is asking about",
-            "priority": 1-3 (1=most important, 3=least important)
+            "intent": "what this sub-query asks about",
+            "priority": 1-3 (1=most important)
         }}
     ]
 }}
@@ -152,11 +172,11 @@ If needs_decomposition is false, include the original query as a single sub-quer
             response = self.llm_client.chat.completions.create(
                 model=self.deployment_name,
                 messages=[
-                    {"role": "system", "content": "You are a helpful assistant that responds in JSON format."},
+                    {"role": "system", "content": "You are a helpful assistant that analyzes queries using step-by-step reasoning. Always respond in JSON format."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
-                max_tokens=500
+                max_tokens=800
             )
             
             result_json = json.loads(response.choices[0].message.content)

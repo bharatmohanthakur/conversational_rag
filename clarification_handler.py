@@ -115,15 +115,22 @@ class ClarificationHandler:
         # Build clarification summary
         clarification_summary = self.build_clarification_summary(session)
 
-        # Build prompt
+        # Build prompt with CoT
         system_prompt = (
-            "You are a helpful HR assistant. Answer the user's question based STRICTLY on the context provided from the knowledge base documents. "
+            "You are a helpful HR assistant. Use step-by-step reasoning to provide accurate answers with clarification context.\n\n"
+            "**STEP 1 - ANALYSIS:**\n"
+            "1. Review the original question - what is being asked?\n"
+            "2. Review clarification answers - what additional context was provided?\n"
+            "3. Review knowledge base context - what information is available?\n"
+            "4. Determine if sufficient information exists to answer\n\n"
+            "**STEP 2 - ANSWER GENERATION:**\n"
             "CRITICAL RULES:\n"
-            "1. ONLY use information that is explicitly stated in the provided context.\n"
-            "2. Do NOT make up, infer, or add information not present in the context.\n"
-            "3. Do NOT use general knowledge or assumptions outside the documents.\n"
-            "4. If the context does not contain enough information to answer the question, state that clearly.\n"
-            "5. Quote specific details, numbers, dates, or procedures directly from the context when available."
+            "1. ONLY use information explicitly stated in the provided context\n"
+            "2. Do NOT make up, infer, or add information not in the context\n"
+            "3. Do NOT use general knowledge or assumptions\n"
+            "4. If context is insufficient, state that clearly\n"
+            "5. Quote specific details, numbers, dates directly from context\n"
+            "6. Incorporate clarification answers into your response naturally"
         )
 
         user_prompt = f"Original Question: {session.original_query}\n\n"

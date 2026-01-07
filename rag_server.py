@@ -1082,18 +1082,34 @@ async def greeting_detection_node(state: AgentState):
     
     # Only use LLM for ambiguous cases (queries that might be greetings or questions)
     prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a greeting detection expert. Determine if the user's message is:\n"
-                   "- A greeting (hello, hi, good morning, etc.)\n"
-                   "- A casual message (thanks, okay, sure, etc.)\n"
-                   "- An emotional expression (thank you, great, awesome, etc.)\n"
-                   "- OR an actual HR question/query that needs to be answered\n\n"
-                   "Examples of greetings/casual:\n"
+        ("system", "You are a greeting detection expert. Use step-by-step reasoning to classify messages.\n\n"
+                   "**STEP 1 - CHAIN OF THOUGHT ANALYSIS:**\n"
+                   "Think through these questions:\n\n"
+                   "1. Message intent analysis:\n"
+                   "   - Is this ONLY a greeting/thanks/casual? (hi, hello, thanks, okay)\n"
+                   "   - Does it contain an actual HR question after the greeting?\n"
+                   "   - What is the PRIMARY purpose of this message?\n\n"
+                   "2. Structure analysis:\n"
+                   "   - Single greeting word: 'Hi' → likely greeting\n"
+                   "   - Greeting + question: 'Hi, what's the policy?' → HR QUERY (not greeting)\n"
+                   "   - Pure thanks: 'Thanks' → casual/greeting\n"
+                   "   - Thanks + question: 'Thanks, but how about...' → HR QUERY\n\n"
+                   "3. Classification rules:\n"
+                   "   - If message contains question words (what, how, when, where) → likely HR QUERY\n"
+                   "   - If message is 1-2 words and matches greeting/thanks → GREETING\n"
+                   "   - If greeting is just an opener followed by real question → HR QUERY (is_greeting=false)\n\n"
+                   "**STEP 2 - FINAL CLASSIFICATION:**\n"
+                   "Based on your analysis:\n\n"
+                   "Greeting/Casual examples (is_greeting=true):\n"
                    "- 'Hello', 'Hi', 'Good morning', 'Hey'\n"
                    "- 'Thanks', 'Thank you', 'Okay', 'Sure'\n"
                    "- 'Great', 'Awesome', 'Perfect'\n\n"
-                   "Examples of HR queries (NOT greetings):\n"
-                   "- 'What is the leave policy?', 'How do I apply for leave?', 'Tell me about insurance'\n"
-                   "- Even if they start with 'Hi, what is...' - this is an HR query, not just a greeting"),
+                   "HR Query examples (is_greeting=false):\n"
+                   "- 'What is the leave policy?'\n"
+                   "- 'Hi, what is the leave policy?' (greeting is just opener)\n"
+                   "- 'Thanks, but how do I apply for leave?' (thanks is transition)\n"
+                   "- 'Tell me about insurance'\n\n"
+                   "CRITICAL: If the message has a real HR question, set is_greeting=false even if it starts with hi/thanks"),
         ("user", "{query}")
     ])
     
@@ -1208,12 +1224,30 @@ async def router_node(state: AgentState):
             return {"complexity": "CLARIFICATION_ANSWER"}
     
     prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are an expert at routing user queries. \n"
-                   "Classify the query as:\n"
-                   "- 'SIMPLE' if it is specific, factual, and can be answered with a single lookup (e.g., 'What is the dress code?', 'How do I apply for leave?', 'What is the notice period?').\n"
-                   "- 'COMPLEX' if it implies multiple steps, comparisons, aggregating information from different sections, or requires a comprehensive guide (e.g., 'Compare the leave policy for sick leave vs annual leave').\n"
-                   "- 'FORMAT' if the user is asking to reformat, summarize differently, or change the presentation of the previous response WITHOUT needing new information (e.g., 'Put that in a table', 'Make it bullet points').\n"
-                   "- 'GENERIC' if the query is ambiguous, too broad, or MISSES CRITICAL CONTEXT (like Country/Location) causing the answer to vary (e.g., 'How many days maternity leave?', 'What are the travel allowances?', 'How can I benefit from insurance?'). These need clarification."),
+        ("system", "You are an expert at routing user queries. Use step-by-step reasoning to classify complexity.\n\n"
+                   "**STEP 1 - CHAIN OF THOUGHT ANALYSIS:**\n"
+                   "Think through these questions:\n\n"
+                   "1. Query specificity:\n"
+                   "   - Is this asking for ONE specific fact? (SIMPLE)\n"
+                   "   - Is this asking for multiple related things? (COMPLEX)\n"
+                   "   - Is this asking to reformat previous answer? (FORMAT)\n"
+                   "   - Is this too vague or missing critical context? (GENERIC)\n\n"
+                   "2. Information requirements:\n"
+                   "   - Single lookup needed? → SIMPLE\n"
+                   "   - Multiple sections/comparisons? → COMPLEX\n"
+                   "   - Just reformatting? → FORMAT\n"
+                   "   - Missing country/role/critical context? → GENERIC\n\n"
+                   "3. Examples analysis:\n"
+                   "   SIMPLE: 'What is the dress code?', 'How do I apply for leave?', 'What is the notice period?'\n"
+                   "   COMPLEX: 'Compare sick leave vs annual leave', 'What are all the benefits?', 'Explain the full onboarding process'\n"
+                   "   FORMAT: 'Put that in a table', 'Make it bullet points', 'Summarize that differently'\n"
+                   "   GENERIC: 'How many days maternity leave?' (missing country), 'What are travel allowances?' (varies by role)\n\n"
+                   "**STEP 2 - CLASSIFICATION:**\n"
+                   "Based on your analysis, classify as:\n\n"
+                   "- 'SIMPLE': Specific, factual, single lookup (e.g., 'What is the dress code?')\n"
+                   "- 'COMPLEX': Multiple steps, comparisons, comprehensive guide (e.g., 'Compare leave policies')\n"
+                   "- 'FORMAT': Reformatting previous response WITHOUT new info (e.g., 'Put in table')\n"
+                   "- 'GENERIC': Ambiguous, too broad, or MISSING CRITICAL CONTEXT like Country/Location/Role (e.g., 'How many days maternity leave?')"),
         ("user", "{query}")
     ])
     # Use JSON mode instead of structured output for compatibility
@@ -1279,23 +1313,42 @@ async def simple_rag_node(state: AgentState):
                         "Provide a detailed, structured answer following the workflow steps. Use numbered steps where appropriate. "
                         "If images/diagrams are provided, reference them in your explanation.")
     else:
-        system_prompt = ("You are a helpful HR assistant. Answer the user request based STRICTLY on the context provided from the knowledge base documents. "
+        system_prompt = ("You are a helpful HR assistant. Use step-by-step reasoning to provide accurate answers.\n\n"
+                        "**STEP 1 - CHAIN OF THOUGHT ANALYSIS:**\n"
+                        "Think through these steps:\n\n"
+                        "1. Context evaluation:\n"
+                        "   - What information is explicitly stated in the provided context?\n"
+                        "   - Is there enough information to answer the question?\n"
+                        "   - Are there any tables/images that need parsing?\n\n"
+                        "2. Table parsing (if tables present):\n"
+                        "   - Check for split headers (e.g., 'Brand A &' → merge with next column)\n"
+                        "   - Check for combined headers (e.g., 'Brand A & Brand B' → values apply to both)\n"
+                        "   - Align columns logically if values appear shifted\n"
+                        "   - Extract the specific values requested\n\n"
+                        "3. Missing information check:\n"
+                        "   - Does the answer vary by Country, Job Position, Seniority?\n"
+                        "   - Has the user provided these variables?\n"
+                        "   - If missing AND answer varies significantly → NEEDS_CLARIFICATION\n"
+                        "   - If missing but can provide general answer → ANSWERED with caveat\n\n"
+                        "4. Answer formulation:\n"
+                        "   - Use ONLY information from the context (no general knowledge)\n"
+                        "   - Quote specific details, numbers, dates from context\n"
+                        "   - Reference images/diagrams if provided\n"
+                        "   - State clearly if information is insufficient\n\n"
+                        "**STEP 2 - ANSWER GENERATION:**\n\n"
                         "CRITICAL RULES:\n"
-                        "1. ONLY use information that is explicitly stated in the provided context.\n"
-                        "2. Do NOT make up, infer, or add information not present in the context.\n"
-                        "3. Do NOT use general knowledge or assumptions outside the documents.\n"
-                        "4. If the context does not contain enough information to answer the question, state that clearly.\n"
-                        "5. Quote specific details, numbers, dates, or procedures directly from the context when available.\n"
-                        "6. If images/diagrams are provided, reference them in your explanation.\n\n"
-                        "TABLE PARSING: Be extremely robust to malformed markdown tables. "
-                        "1. HEADERS SPLIT: If a column header looks cut off (e.g., ends in '&' or starts with a lowercase letter), it belongs to the previous column. Merge them. "
-                        "2. VALUES SHIFTED: If columns are split, their values might be shifted. Align them logically. "
-                        "3. COMBINED HEADERS: If a header mentions multiple entities (e.g. 'Brand A & Brand B' or 'OYSHO Pull & Bear'), the values in that column apply to ALL listed entities. "
-                        "4. EXTRACT VALUES: Do not complain about formatting. Use your best judgement to reconstruct the table and return the requested value.\n\n"
-                        "**DYNAMIC CLARIFICATION**:\n"
-                        "If the retrieved context shows that the answer varies based on specific criteria (e.g., Job Position, Country, Seniority) that the user HAS NOT provided, do **not** try to list every possible option.\n"
-                        "Instead, set status to 'NEEDS_CLARIFICATION' and list the missing variables (e.g. ['Job Position']).\n"
-                        "Only set this if the answer is TRULY ambiguous without that info.")
+                        "1. ONLY use information explicitly stated in the provided context\n"
+                        "2. Do NOT make up, infer, or add information not in the context\n"
+                        "3. Do NOT use general knowledge or assumptions\n"
+                        "4. If context is insufficient, state that clearly\n"
+                        "5. Quote specific details, numbers, dates directly from context\n"
+                        "6. Reference images/diagrams in your explanation\n\n"
+                        "**DYNAMIC CLARIFICATION:**\n"
+                        "If the answer varies based on criteria (Country, Position, Seniority) that the user HAS NOT provided:\n"
+                        "- Do NOT list every possible option\n"
+                        "- Set status to 'NEEDS_CLARIFICATION'\n"
+                        "- List missing variables (e.g., ['Job Position', 'Country'])\n"
+                        "- Only do this if the answer is TRULY ambiguous without that info")
     
     # Multimodal inference if images are present
     messages = []
@@ -1395,17 +1448,23 @@ async def synthesizer_node(state: AgentState):
     combined_context = "\n\n".join(sub_answers)
     
     messages = [
-        ("system", "You are a helpful HR expert. You have gathered information for a complex user request. "
-                   "Synthesize the provided sub-answers into a cohesive final report.\n\n"
+        ("system", "You are a helpful HR expert. Use step-by-step reasoning to synthesize complex information.\n\n"
+                   "**STEP 1 - ANALYSIS:**\n"
+                   "1. Review all sub-answers - what information is available?\n"
+                   "2. Identify connections and patterns across sub-answers\n"
+                   "3. Check for gaps or missing information\n"
+                   "4. Determine how to structure the final answer\n\n"
+                   "**STEP 2 - SYNTHESIS:**\n"
+                   "Create a cohesive answer following these rules:\n\n"
                    "CRITICAL RULES:\n"
-                   "1. ONLY use information that is explicitly stated in the provided sub-answers (which come from knowledge base documents).\n"
-                   "2. Do NOT make up, infer, or add information not present in the sub-answers.\n"
-                   "3. Do NOT use general knowledge or assumptions outside the documents.\n"
-                   "4. If the sub-answers do not contain enough information, state that clearly.\n\n"
-                   "**CRITICAL INSTRUCTION**:\n"
-                   "1. **Direct Answer First**: Start by directly answering the user's ORIGINAL request using the synthesized information.\n"
-                   "2. **Supporting Details**: Then, provide the detailed breakdown based on the sub-queries investigating specific aspects.\n"
-                   "3. Do not explicitly mention 'sub-queries' or 'step 1', just weave the information together naturally."),
+                   "1. ONLY use information explicitly in the sub-answers (from knowledge base)\n"
+                   "2. Do NOT make up, infer, or add information not present\n"
+                   "3. Do NOT use general knowledge or assumptions\n"
+                   "4. If information is insufficient, state that clearly\n\n"
+                   "STRUCTURE:\n"
+                   "1. **Direct Answer First**: Start by directly answering the original request\n"
+                   "2. **Supporting Details**: Provide detailed breakdown naturally\n"
+                   "3. Do NOT mention 'sub-queries' or 'step 1' - weave information together seamlessly"),
         ("user", f"Original Request: {original_query}\n\nGathered Information from Knowledge Base:\n{combined_context}\n\n"
                 f"Based STRICTLY on the information above, synthesize a comprehensive answer. If information is missing, say so explicitly.")
     ]
@@ -1469,13 +1528,20 @@ async def clarifier_node(state: AgentState):
                 ])
             
             messages = [
-                ("system", "You are a helpful HR assistant. Answer the user's question based STRICTLY on the context provided from the knowledge base documents. "
+                ("system", "You are a helpful HR assistant. Use step-by-step reasoning to answer with clarification context.\n\n"
+                          "**STEP 1 - ANALYSIS:**\n"
+                          "1. Review the original question - what is being asked?\n"
+                          "2. Review clarification answers - what additional context was provided?\n"
+                          "3. Review knowledge base context - what information is available?\n"
+                          "4. Determine if sufficient information exists to answer\n\n"
+                          "**STEP 2 - ANSWER GENERATION:**\n"
                           "CRITICAL RULES:\n"
-                          "1. ONLY use information that is explicitly stated in the provided context.\n"
-                          "2. Do NOT make up, infer, or add information not present in the context.\n"
-                          "3. Do NOT use general knowledge or assumptions outside the documents.\n"
-                          "4. If the context does not contain enough information to answer the question, state that clearly.\n"
-                          "5. Quote specific details, numbers, dates, or procedures directly from the context when available."),
+                          "1. ONLY use information explicitly stated in the provided context\n"
+                          "2. Do NOT make up, infer, or add information not in the context\n"
+                          "3. Do NOT use general knowledge or assumptions\n"
+                          "4. If context is insufficient, state that clearly\n"
+                          "5. Quote specific details, numbers, dates directly from context\n"
+                          "6. Incorporate the clarification answers into your response naturally"),
                 ("user", f"Original Question: {existing_session.original_query}\n\n"
                         + (f"Clarification Answers Provided:\n{clarification_summary}\n\n" if clarification_summary else "")
                         + f"Context from Knowledge Base:\n{context}\n\n"
@@ -1512,13 +1578,20 @@ async def clarifier_node(state: AgentState):
                 ])
             
             messages = [
-                ("system", "You are a helpful HR assistant. Answer the user's question based STRICTLY on the context provided from the knowledge base documents. "
+                ("system", "You are a helpful HR assistant. Use step-by-step reasoning to answer with clarification context.\n\n"
+                          "**STEP 1 - ANALYSIS:**\n"
+                          "1. Review the original question - what is being asked?\n"
+                          "2. Review clarification answers - what additional context was provided?\n"
+                          "3. Review knowledge base context - what information is available?\n"
+                          "4. Determine if sufficient information exists to answer\n\n"
+                          "**STEP 2 - ANSWER GENERATION:**\n"
                           "CRITICAL RULES:\n"
-                          "1. ONLY use information that is explicitly stated in the provided context.\n"
-                          "2. Do NOT make up, infer, or add information not present in the context.\n"
-                          "3. Do NOT use general knowledge or assumptions outside the documents.\n"
-                          "4. If the context does not contain enough information to answer the question, state that clearly.\n"
-                          "5. Quote specific details, numbers, dates, or procedures directly from the context when available."),
+                          "1. ONLY use information explicitly stated in the provided context\n"
+                          "2. Do NOT make up, infer, or add information not in the context\n"
+                          "3. Do NOT use general knowledge or assumptions\n"
+                          "4. If context is insufficient, state that clearly\n"
+                          "5. Quote specific details, numbers, dates directly from context\n"
+                          "6. Incorporate the clarification answers into your response naturally"),
                 ("user", f"Original Question: {existing_session.original_query}\n\n"
                         + (f"Clarification Answers Provided:\n{clarification_summary}\n\n" if clarification_summary else "")
                         + f"Context from Knowledge Base:\n{context}\n\n"

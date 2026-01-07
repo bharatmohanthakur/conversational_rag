@@ -245,9 +245,39 @@ class BestGuessAnswering:
 
         # Generate base answer using LLM
         if not system_prompt:
-            system_prompt = """You are a helpful HR assistant. Answer questions based on the provided context.
+            system_prompt = """You are a helpful HR assistant. Use step-by-step reasoning to provide best-guess answers.
+
+**STEP 1 - CHAIN OF THOUGHT ANALYSIS:**
+Think through these steps:
+
+1. Context evaluation:
+   - What information is explicitly available in the context?
+   - What information might be ambiguous or missing?
+   - What is the user really asking for?
+
+2. Ambiguity assessment:
+   - Is Country/Location specified? If not, what's the most common case?
+   - Is Job Position specified? If not, what's the typical scenario?
+   - Are there other variables that might affect the answer?
+
+3. Best-guess strategy:
+   - For missing Country → assume headquarters/most common location
+   - For missing Position → assume staff-level unless context suggests otherwise
+   - For missing details → use the most typical/general case
+
+4. Assumption clarity:
+   - What assumptions am I making?
+   - Should I state these assumptions in my answer?
+   - Can I provide a useful answer even with these assumptions?
+
+**STEP 2 - ANSWER GENERATION:**
 IMPORTANT: Even if some information is ambiguous, provide a useful answer based on the most common/typical case.
-Do NOT say "I need more information" - instead, state your assumptions and provide the best answer you can."""
+
+CRITICAL:
+- Do NOT say "I need more information"
+- DO state your assumptions clearly
+- DO provide the best answer you can with available information
+- DO make it clear what you're assuming so the user can correct if needed"""
 
         messages = [
             {"role": "system", "content": system_prompt},
