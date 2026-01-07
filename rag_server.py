@@ -1261,16 +1261,31 @@ async def router_node(state: AgentState):
         logger.info(f"🎯 Router: High confidence match detected - Routing to SIMPLE (skip decomposition/complex analysis)")
         return {"complexity": "SIMPLE"}
 
+    # Check for user dissatisfaction - handle conversation repair FIRST
+    if previous_response and len(previous_response) > 50:  # Only check if there was a substantial previous response
+        dissatisfaction_result = await detect_user_dissatisfaction(query, previous_response)
+        if dissatisfaction_result.get("is_dissatisfied") and dissatisfaction_result.get("confidence", 0) > 0.7:
+            logger.info(f"🔧 Router: Detected user dissatisfaction - initiating conversation repair")
+            repair_response = await generate_repair_response(query, previous_response, dissatisfaction_result.get("repair_strategy"))
+            if repair_response:
+                # Return repair response directly
+                return {
+                    "complexity": "REPAIR",
+                    "final_answer": repair_response,
+                    "awaiting_clarification": False,
+                    "sources": []
+                }
+
     # Check if user is responding to a document preference question
     preference_keywords = ["workflow", "policy", "guideline", "both", "1", "2", "3"]
     is_preference_response = (
         "Which type would you prefer" in previous_response and
         any(kw in query.lower() for kw in preference_keywords)
     )
-    
+
     if is_preference_response:
         return {"complexity": "DOC_PREFERENCE"}
-    
+
     # Check if user is answering clarifying questions (CHECK FIRST, before LLM routing)
     active_session = clarification_tracker.get_active_session(user_id)
     if active_session:
@@ -1316,6 +1331,378 @@ async def router_node(state: AgentState):
     import json
     result_dict = json.loads(response.content)
     return {"complexity": result_dict.get("complexity", "SIMPLE")}
+
+# Helper: Detect Hallucinations (Critical for RAG)
+async def detect_hallucinations(answer: str, sources: List[Dict], context: str) -> Dict[str, Any]:
+    """
+    Verify that answer claims are grounded in the provided sources.
+    Critical for RAG systems to prevent hallucinations.
+    """
+    try:
+        # Extract source content for verification
+        source_texts = []
+        for s in sources[:5]:  # Check top 5 sources
+            text_snippet = s.get("text_snippet", "")
+            if text_snippet:
+                source_texts.append(text_snippet[:500])  # Limit per source
+
+        combined_sources = "\n\n".join(source_texts)
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are a fact-checking expert for RAG systems. Verify if the answer is grounded in sources.
+
+**CRITICAL TASK:** Identify any claims in the answer that are NOT supported by the source material.
+
+**Analysis Steps:**
+
+1. **Extract Claims:** List key factual claims in the answer
+   - Specific numbers (days, amounts, percentages)
+   - Policy rules (eligibility, requirements)
+   - Procedures (steps, processes)
+   - Exceptions or special cases
+
+2. **Verification:** For EACH claim, check:
+   - ✅ **Grounded:** Explicitly stated in sources
+   - ⚠️ **Inferred:** Reasonable interpretation of sources (acceptable if logical)
+   - ❌ **Ungrounded:** NOT in sources (hallucination - CRITICAL)
+
+3. **Hallucination Types:**
+   - **Fabricated facts:** Invented numbers, dates, rules
+   - **Overgeneralization:** "All employees" when sources say "Staff-level"
+   - **Contradictions:** Answer conflicts with sources
+   - **External knowledge:** Using general knowledge not in sources
+
+**Output Format:**
+Return JSON with:
+- is_hallucinating (boolean): True if ANY ungrounded claims detected
+- confidence (0.0-1.0): Confidence in detection
+- ungrounded_claims (array of strings): List of specific ungrounded claims
+- severity (string): "none" | "minor" | "moderate" | "severe"
+- recommendation (string): "accept" | "flag_for_review" | "regenerate"
+
+**IMPORTANT:**
+- Inferred facts that are logical extensions are OK
+- Minor formatting/phrasing differences are OK
+- Missing information is better than wrong information"""),
+            ("user", f"Answer to verify:\n{answer}\n\n---\n\nSource Material:\n{combined_sources}\n\nVerify if answer is grounded in sources:")
+        ])
+
+        messages = prompt.format_messages()
+        response = await agent_llm.ainvoke(
+            messages + [("system", "Respond in JSON format")]
+        )
+
+        import json
+        result = json.loads(response.content)
+        logger.info(f"Hallucination detection: {result.get('is_hallucinating')} (severity: {result.get('severity')})")
+        return result
+
+    except Exception as e:
+        logger.error(f"Error detecting hallucinations: {e}")
+        # Conservative approach: assume no hallucination on error
+        return {
+            "is_hallucinating": False,
+            "confidence": 0.3,
+            "ungrounded_claims": [],
+            "severity": "none",
+            "recommendation": "accept"
+        }
+
+# Helper: Detect User Dissatisfaction (Gemini-style conversation repair)
+async def detect_user_dissatisfaction(query: str, previous_response: str = "") -> Dict[str, Any]:
+    """
+    Detect signals of user dissatisfaction or misunderstanding.
+    Returns repair strategy if dissatisfaction detected.
+    """
+    try:
+        # Quick pattern matching for obvious dissatisfaction signals
+        dissatisfaction_patterns = [
+            "that's not what i asked", "not what i meant", "no i meant",
+            "that doesn't answer", "that's wrong", "incorrect",
+            "try again", "rephrase", "explain differently",
+            "i don't understand", "confused", "unclear",
+            "not helpful", "doesn't help", "still don't know"
+        ]
+
+        query_lower = query.lower()
+        has_obvious_dissatisfaction = any(pattern in query_lower for pattern in dissatisfaction_patterns)
+
+        if has_obvious_dissatisfaction:
+            logger.info(f"Detected obvious dissatisfaction signal: {query[:50]}")
+            return {
+                "is_dissatisfied": True,
+                "confidence": 0.95,
+                "repair_strategy": "apologize_and_clarify"
+            }
+
+        # Use LLM for subtle dissatisfaction detection
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are a conversation quality analyzer detecting user dissatisfaction.
+
+Analyze if the user's message indicates:
+1. The previous answer didn't address their question
+2. They're confused or need clarification
+3. They're frustrated or dissatisfied
+4. They're asking the same question in a different way (repetition)
+
+**Dissatisfaction Signals:**
+- Direct: "That's not what I asked", "No, I meant..."
+- Indirect: "But what about...", "Still unclear...", "I meant..."
+- Repetition: Asking same question differently after getting answer
+- Frustration: "Never mind", "Forget it"
+
+**NOT Dissatisfaction:**
+- Follow-up questions on same topic (genuine interest)
+- Asking for more details (curiosity)
+- Related questions (natural flow)
+
+Return JSON with:
+- is_dissatisfied (boolean)
+- confidence (0.0-1.0)
+- reason (string: why detected/not detected)
+- repair_strategy (string: apologize_and_clarify | rephrase_question | escalate | null)"""),
+            ("user", f"Previous response: {previous_response[:200]}...\n\nUser's new message: {query}\n\nIs the user dissatisfied?")
+        ])
+
+        messages = prompt.format_messages()
+        response = await agent_llm.ainvoke(
+            messages + [("system", "Respond in JSON format")]
+        )
+
+        import json
+        result = json.loads(response.content)
+        logger.info(f"Dissatisfaction detection: {result.get('is_dissatisfied')} ({result.get('confidence')})")
+        return result
+
+    except Exception as e:
+        logger.error(f"Error detecting dissatisfaction: {e}")
+        return {"is_dissatisfied": False, "confidence": 0.5, "repair_strategy": None}
+
+# Helper: Generate Repair Response
+async def generate_repair_response(query: str, previous_response: str, repair_strategy: str) -> str:
+    """
+    Generate appropriate repair response based on detected dissatisfaction.
+    """
+    try:
+        if repair_strategy == "apologize_and_clarify":
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", """You are a helpful HR assistant recovering from a misunderstanding.
+
+Generate a repair response that:
+1. Acknowledges the confusion/misunderstanding warmly
+2. Asks for clarification on what they actually need
+3. Offers specific options or ways to rephrase
+4. Shows willingness to help differently
+5. Maintains professionalism and patience
+
+Tone: Apologetic but not overly defensive, helpful, patient
+
+Examples:
+- "I apologize for the confusion. Let me try to understand better - are you asking about X or Y?"
+- "I may have misunderstood your question. Could you help me understand what specific aspect you're looking for?"
+- "Let me clarify - were you asking about... or did you mean something else?"
+
+Keep it brief (2-3 sentences) and actionable."""),
+                ("user", f"Previous response that wasn't helpful: {previous_response[:200]}\n\nUser's feedback: {query}\n\nGenerate repair response:")
+            ])
+
+            messages = prompt.format_messages()
+            response = await agent_llm.ainvoke(messages)
+            return response.content
+
+        elif repair_strategy == "rephrase_question":
+            return ("I want to make sure I understand correctly. Could you rephrase your question or tell me more about what specific information you're looking for? "
+                   "I'm here to help and want to give you the right answer.")
+
+        elif repair_strategy == "escalate":
+            return ("I apologize that I haven't been able to answer your question satisfactorily. This might be a complex case that requires verification with your HR department directly. "
+                   "Would you like me to try answering from a different angle, or would you prefer to contact HR for personalized assistance?")
+
+        else:
+            return None  # No repair needed
+
+    except Exception as e:
+        logger.error(f"Error generating repair response: {e}")
+        return None
+
+# Helper: Add Confidence Score Communication (Claude-style transparency)
+def add_confidence_communication(answer: str, sources: List[Dict], confidence_score: float = None) -> tuple[str, float]:
+    """
+    Add transparent confidence communication to answers.
+    Inspired by Claude's uncertainty communication and answer quality indicators.
+    """
+    try:
+        # Calculate confidence if not provided
+        if confidence_score is None:
+            # Base confidence on source quality
+            if not sources:
+                confidence_score = 0.3
+            else:
+                avg_score = sum([s.get("score", 0.5) for s in sources[:5]]) / min(len(sources), 5)
+                num_sources = len(sources)
+
+                # Confidence factors:
+                # - Higher avg score → higher confidence
+                # - More sources → higher confidence (up to 5)
+                # - High filename matches (score > 10) → very high confidence
+                has_high_filename_match = any(s.get("score", 0) > 10.0 for s in sources[:3])
+
+                if has_high_filename_match:
+                    confidence_score = 0.95  # Very high confidence
+                elif avg_score > 0.8 and num_sources >= 3:
+                    confidence_score = 0.85  # High confidence
+                elif avg_score > 0.6 and num_sources >= 2:
+                    confidence_score = 0.70  # Medium-high confidence
+                elif avg_score > 0.4:
+                    confidence_score = 0.55  # Medium confidence
+                else:
+                    confidence_score = 0.40  # Low-medium confidence
+
+        # Add confidence prefix based on score
+        if confidence_score >= 0.80:
+            prefix = "**According to our official policy documents:**\n\n"
+            suffix = f"\n\n---\n*Confidence: High ({confidence_score:.0%}) • {len(sources)} source(s)*"
+        elif confidence_score >= 0.60:
+            prefix = "**Based on the available documents:**\n\n"
+            suffix = f"\n\n---\n*Confidence: Medium ({confidence_score:.0%}) • {len(sources)} source(s)*"
+        elif confidence_score >= 0.40:
+            prefix = "**From what I found in the documents:**\n\n"
+            suffix = f"\n\n---\n*⚠️ Confidence: Moderate ({confidence_score:.0%}) • {len(sources)} source(s) - You may want to verify this information*"
+        else:
+            prefix = "**⚠️ I found limited information on this topic:**\n\n"
+            suffix = f"\n\n---\n*⚠️ Confidence: Low ({confidence_score:.0%}) • {len(sources)} source(s) - Please verify this information with your HR department*"
+
+        enhanced_answer = prefix + answer + suffix
+        logger.info(f"Added confidence communication: {confidence_score:.2f}")
+        return enhanced_answer, confidence_score
+
+    except Exception as e:
+        logger.error(f"Error adding confidence communication: {e}")
+        return answer, 0.5  # Return original with neutral confidence on error
+
+# Helper: Apply Rich Formatting (Claude/GPT-4 style)
+async def apply_rich_formatting(query: str, answer: str, context: str) -> str:
+    """
+    Enhance answers with rich formatting: tables, bullets, numbered steps, callouts.
+    Inspired by Claude's markdown formatting and GPT-4's structured outputs.
+    """
+    try:
+        # Detect if answer would benefit from formatting
+        needs_formatting = any([
+            "compare" in query.lower() or "vs" in query.lower(),  # Comparisons → table
+            "steps" in query.lower() or "how to" in query.lower(),  # Procedures → numbered list
+            "types" in query.lower() or "categories" in query.lower(),  # Lists → bullets
+            len(answer.split('\n')) > 5  # Long answer → structure it
+        ])
+
+        if not needs_formatting:
+            return answer  # Keep short answers simple
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are a formatting expert. Enhance the answer with optimal visual structure.
+
+**FORMATTING GUIDELINES:**
+
+1. **Tables** - Use for:
+   - Comparisons (leave types, benefit tiers, countries)
+   - Multiple items with attributes (eligibility, amounts, durations)
+   - Format: Markdown tables with clear headers
+
+2. **Numbered Lists** - Use for:
+   - Step-by-step procedures
+   - Sequential workflows
+   - Ordered instructions
+
+3. **Bullet Points** - Use for:
+   - Unordered lists
+   - Requirements/eligibility criteria
+   - Key points
+
+4. **Callout Boxes** - Use for:
+   - Important notes: `> **⚠️ Important:** ...`
+   - Tips: `> **💡 Tip:** ...`
+   - Examples: `> **📝 Example:** ...`
+
+5. **Section Headers** - Use ### for main sections
+
+6. **Bold/Emphasis** - Use **bold** for key terms, amounts, dates
+
+**CRITICAL RULES:**
+- Preserve ALL factual information from original answer
+- Don't add new information not in the original
+- Keep the same tone and completeness
+- Only restructure for better readability
+- If original is already well-formatted, return as-is
+
+Return ONLY the formatted answer, no explanations."""),
+            ("user", f"Query: {query}\n\nOriginal Answer:\n{answer}\n\nFormat this optimally:")
+        ])
+
+        messages = prompt.format_messages()
+        response = await agent_llm.ainvoke(messages)
+        formatted_answer = response.content
+
+        logger.info(f"Applied rich formatting to answer")
+        return formatted_answer
+
+    except Exception as e:
+        logger.error(f"Error applying rich formatting: {e}")
+        return answer  # Return original on error
+
+# Helper: Generate Proactive Follow-up Suggestions (Gemini-style)
+async def generate_followup_suggestions(query: str, answer: str, sources: List[Dict], max_suggestions: int = 3) -> List[str]:
+    """
+    Generate proactive follow-up question suggestions based on the answer provided.
+    Inspired by Gemini's "You might also want to know" feature.
+    """
+    try:
+        # Extract topics from sources
+        source_topics = list(set([s.get("source", "").split(" - ")[0] for s in sources[:3]]))
+        topics_context = f"Available topics: {', '.join(source_topics)}" if source_topics else ""
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are a helpful HR assistant that suggests relevant follow-up questions.
+
+**STEP 1 - ANALYSIS:**
+Based on the question asked and answer provided, think about:
+1. What related aspects might the user want to know?
+2. What common follow-up questions arise from this topic?
+3. What practical next steps would be helpful?
+4. What related policies or procedures connect to this?
+
+**STEP 2 - SUGGESTION GENERATION:**
+Generate 3 natural, conversational follow-up questions that:
+- Are directly related but explore different angles
+- Sound like real questions a person would ask
+- Are specific and actionable (not too vague)
+- Cover common next steps or related concerns
+- Use conversational language
+
+IMPORTANT:
+- Keep questions short and natural (10-15 words)
+- Don't repeat the original question
+- Make them genuinely useful
+- Cover different aspects (eligibility, process, exceptions, etc.)
+
+Return as a JSON array of strings."""),
+            ("user", f"Original Question: {query}\n\nAnswer Provided: {answer[:300]}...\n\n{topics_context}\n\nGenerate {max_suggestions} follow-up question suggestions:")
+        ])
+
+        messages = prompt.format_messages()
+        response = await agent_llm.ainvoke(
+            messages + [("system", "Respond in JSON format with field: suggestions (array of strings)")]
+        )
+
+        import json
+        result_dict = json.loads(response.content)
+        suggestions = result_dict.get("suggestions", [])[:max_suggestions]
+
+        logger.info(f"Generated {len(suggestions)} follow-up suggestions")
+        return suggestions
+
+    except Exception as e:
+        logger.error(f"Error generating follow-up suggestions: {e}")
+        return []  # Return empty list on error, don't block the response
 
 # 2. Simple Handler (Direct RAG)
 class SimpleRAGOutput(BaseModel):
@@ -1456,10 +1843,34 @@ async def simple_rag_node(state: AgentState):
     # If high confidence filename match (>85%), bypass clarification and show results directly
     if state.get("high_confidence_match", False):
         logger.info(f"🎯 High confidence match - Bypassing clarification, showing direct answer")
+
+        # Hallucination detection - verify answer is grounded
+        hallucination_check = await detect_hallucinations(result.answer, sources, context)
+        if hallucination_check.get("is_hallucinating") and hallucination_check.get("severity") in ["moderate", "severe"]:
+            logger.warning(f"⚠️ Hallucination detected (severity: {hallucination_check.get('severity')})")
+            # Add warning to answer
+            warning_prefix = f"\n\n> **⚠️ Answer Quality Notice:** Some claims may need verification. Unverified: {', '.join(hallucination_check.get('ungrounded_claims', [])[:2])}\n\n"
+            result.answer = warning_prefix + result.answer
+
+        # Apply rich formatting
+        formatted_answer = await apply_rich_formatting(query, result.answer, context)
+
+        # Add confidence communication
+        answer_with_confidence, confidence = add_confidence_communication(formatted_answer, sources)
+
+        # Generate proactive suggestions
+        suggestions = await generate_followup_suggestions(query, formatted_answer, sources)
+        if suggestions:
+            answer_with_confidence += "\n\n**You might also want to know:**\n"
+            for i, suggestion in enumerate(suggestions, 1):
+                answer_with_confidence += f"{i}. {suggestion}\n"
+
         return {
-            "final_answer": result.answer,
+            "final_answer": answer_with_confidence,
             "sources": sources,
-            "images": retrieved_images
+            "images": retrieved_images,
+            "confidence_score": confidence,
+            "hallucination_check": hallucination_check
         }
 
     if result.status == "NEEDS_CLARIFICATION":
@@ -1473,10 +1884,33 @@ async def simple_rag_node(state: AgentState):
             "complexity": "GENERIC" # Shift complexity to GENERIC (Clarification)
         }
     else:
+        # Hallucination detection - verify answer is grounded
+        hallucination_check = await detect_hallucinations(result.answer, sources, context)
+        if hallucination_check.get("is_hallucinating") and hallucination_check.get("severity") in ["moderate", "severe"]:
+            logger.warning(f"⚠️ Hallucination detected (severity: {hallucination_check.get('severity')})")
+            # Add warning to answer
+            warning_prefix = f"\n\n> **⚠️ Answer Quality Notice:** Some claims may need verification. Unverified: {', '.join(hallucination_check.get('ungrounded_claims', [])[:2])}\n\n"
+            result.answer = warning_prefix + result.answer
+
+        # Apply rich formatting to complete answers
+        formatted_answer = await apply_rich_formatting(query, result.answer, context)
+
+        # Add confidence communication
+        answer_with_confidence, confidence = add_confidence_communication(formatted_answer, sources)
+
+        # Generate proactive suggestions
+        suggestions = await generate_followup_suggestions(query, formatted_answer, sources)
+        if suggestions:
+            answer_with_confidence += "\n\n**You might also want to know:**\n"
+            for i, suggestion in enumerate(suggestions, 1):
+                answer_with_confidence += f"{i}. {suggestion}\n"
+
         return {
-            "final_answer": result.answer,
+            "final_answer": answer_with_confidence,
             "sources": sources,
-            "images": retrieved_images
+            "images": retrieved_images,
+            "confidence_score": confidence,
+            "hallucination_check": hallucination_check
         }
 
 # 3. Decomposer (Complex Path)
