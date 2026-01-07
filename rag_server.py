@@ -866,8 +866,17 @@ async def _retrieve_single_query(query: str, user_id: str, use_advanced_rag: boo
             pl = p.payload or {}
             src_file = pl.get('source_file', 'unknown')
             content_score = p.score or 0
-            fname_boost = filename_scores.get(src_file, 0) * 0.3
-            combined_score = content_score + fname_boost
+
+            # Apply filename similarity threshold - high matches (>85%) get top priority
+            fname_score = filename_scores.get(src_file, 0)
+            if fname_score > 0.85:
+                # High filename match (>85%) - force top priority
+                combined_score = 10.0 + fname_score  # Ensures it ranks above all normal scores
+                logger.info(f"🎯 High filename match ({fname_score:.2f}) - prioritizing: {src_file}")
+            else:
+                # Normal boost for moderate filename matches
+                fname_boost = fname_score * 0.3
+                combined_score = content_score + fname_boost
             
             documents_for_rerank.append({
                 "content": pl.get('text', ''),
