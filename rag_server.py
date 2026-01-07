@@ -1291,30 +1291,36 @@ async def simple_rag_node(state: AgentState):
     has_workflow = len(workflow_sources) > 0
     has_normal = len(normal_sources) > 0
     
-    # If we have BOTH types, ask user for preference
+    # If we have BOTH types, use filename similarity scores to auto-prioritize
     if has_workflow and has_normal:
-        workflow_docs = list(set([s["source"] for s in workflow_sources]))
-        normal_docs = list(set([s["source"] for s in normal_sources]))
-        
-        response_text = (
-            "I found relevant information from both **workflow documents** and **policy/guideline documents**.\n\n"
-            f"**Workflow Documents** (step-by-step procedures):\n" + 
-            "\n".join([f"- {doc}" for doc in workflow_docs[:3]]) + "\n\n"
-            f"**Policy/Guideline Documents**:\n" + 
-            "\n".join([f"- {doc}" for doc in normal_docs[:3]]) + "\n\n"
-            "Which type would you prefer?\n"
-            "1. **Workflow** - Detailed step-by-step process\n"
-            "2. **Policy/Guideline** - General rules and information\n"
-            "3. **Both** - Combined information from all sources\n\n"
-            "Please reply with your preference (e.g., 'workflow', 'policy', or 'both')."
-        )
-        return {
-            "final_answer": response_text, 
-            "sources": sources,
-            "images": retrieved_images,
-            "awaiting_clarification": True,
-            "clarifying_questions": ["Document type preference: workflow, policy, or both?"]
-        }
+        # Get top scores from each type
+        workflow_top_score = max([s.get("score", 0) for s in workflow_sources]) if workflow_sources else 0
+        normal_top_score = max([s.get("score", 0) for s in normal_sources]) if normal_sources else 0
+
+        # High filename match (score > 10.0 indicates >85% filename similarity) takes precedence
+        if workflow_top_score > 10.0 and workflow_top_score > normal_top_score:
+            # Workflow has high filename match - prioritize workflow docs
+            logger.info(f"📋 Mixed docs detected - Prioritizing WORKFLOW (score: {workflow_top_score:.2f})")
+            sources = workflow_sources
+            has_normal = False  # Treat as workflow-only for system prompt
+        elif normal_top_score > 10.0 and normal_top_score > workflow_top_score:
+            # Policy has high filename match - prioritize policy docs
+            logger.info(f"📋 Mixed docs detected - Prioritizing POLICY (score: {normal_top_score:.2f})")
+            sources = normal_sources
+            has_workflow = False  # Treat as policy-only for system prompt
+        elif workflow_top_score > normal_top_score:
+            # No high filename match, but workflow scores higher overall
+            logger.info(f"📋 Mixed docs detected - Prioritizing WORKFLOW by score ({workflow_top_score:.2f} > {normal_top_score:.2f})")
+            sources = workflow_sources
+            has_normal = False
+        else:
+            # Policy scores higher overall
+            logger.info(f"📋 Mixed docs detected - Prioritizing POLICY by score ({normal_top_score:.2f} > {workflow_top_score:.2f})")
+            sources = normal_sources
+            has_workflow = False
+
+        # Update context with prioritized sources
+        context = "\n".join([s.get("text_snippet", "") for s in sources[:7]])
     
     # Build messages with multimodal support if images are present
     if has_workflow and not has_normal:
