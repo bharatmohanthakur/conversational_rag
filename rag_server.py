@@ -1213,7 +1213,12 @@ async def router_node(state: AgentState):
     query = state["original_query"]
     user_id = state["user_id"]
     previous_response = state.get("previous_response", "")
-    
+
+    # PRIORITY: Check if we have high confidence filename match (>85%) - skip complex processing
+    if state.get("high_confidence_match", False):
+        logger.info(f"🎯 Router: High confidence match detected - Routing to SIMPLE (skip decomposition/complex analysis)")
+        return {"complexity": "SIMPLE"}
+
     # Check if user is responding to a document preference question
     preference_keywords = ["workflow", "policy", "guideline", "both", "1", "2", "3"]
     is_preference_response = (
@@ -1291,36 +1296,41 @@ async def simple_rag_node(state: AgentState):
     has_workflow = len(workflow_sources) > 0
     has_normal = len(normal_sources) > 0
     
-    # If we have BOTH types, use filename similarity scores to auto-prioritize
+    # PRIORITY 1: If we have BOTH types, immediately ask user for preference (no auto-decision)
     if has_workflow and has_normal:
-        # Get top scores from each type
-        workflow_top_score = max([s.get("score", 0) for s in workflow_sources]) if workflow_sources else 0
-        normal_top_score = max([s.get("score", 0) for s in normal_sources]) if normal_sources else 0
+        workflow_docs = list(set([s["source"] for s in workflow_sources]))
+        normal_docs = list(set([s["source"] for s in normal_sources]))
 
-        # High filename match (score > 10.0 indicates >85% filename similarity) takes precedence
-        if workflow_top_score > 10.0 and workflow_top_score > normal_top_score:
-            # Workflow has high filename match - prioritize workflow docs
-            logger.info(f"📋 Mixed docs detected - Prioritizing WORKFLOW (score: {workflow_top_score:.2f})")
-            sources = workflow_sources
-            has_normal = False  # Treat as workflow-only for system prompt
-        elif normal_top_score > 10.0 and normal_top_score > workflow_top_score:
-            # Policy has high filename match - prioritize policy docs
-            logger.info(f"📋 Mixed docs detected - Prioritizing POLICY (score: {normal_top_score:.2f})")
-            sources = normal_sources
-            has_workflow = False  # Treat as policy-only for system prompt
-        elif workflow_top_score > normal_top_score:
-            # No high filename match, but workflow scores higher overall
-            logger.info(f"📋 Mixed docs detected - Prioritizing WORKFLOW by score ({workflow_top_score:.2f} > {normal_top_score:.2f})")
-            sources = workflow_sources
-            has_normal = False
-        else:
-            # Policy scores higher overall
-            logger.info(f"📋 Mixed docs detected - Prioritizing POLICY by score ({normal_top_score:.2f} > {workflow_top_score:.2f})")
-            sources = normal_sources
-            has_workflow = False
+        logger.info(f"📋 Mixed docs detected - Prompting user immediately")
+        response_text = (
+            "I found relevant information from both **workflow documents** and **policy/guideline documents**.\n\n"
+            f"**Workflow Documents** (step-by-step procedures):\n" +
+            "\n".join([f"- {doc}" for doc in workflow_docs[:3]]) + "\n\n"
+            f"**Policy/Guideline Documents**:\n" +
+            "\n".join([f"- {doc}" for doc in normal_docs[:3]]) + "\n\n"
+            "Which type would you prefer?\n"
+            "1. **Workflow** - Detailed step-by-step process\n"
+            "2. **Policy/Guideline** - General rules and information\n"
+            "3. **Both** - Combined information from all sources\n\n"
+            "Please reply with your preference (e.g., 'workflow', 'policy', or 'both')."
+        )
+        return {
+            "final_answer": response_text,
+            "sources": sources,
+            "images": retrieved_images,
+            "awaiting_clarification": True,
+            "clarifying_questions": ["Document type preference: workflow, policy, or both?"]
+        }
 
-        # Update context with prioritized sources
+    # PRIORITY 2: Check if any document has >85% filename similarity (score > 10.0)
+    high_filename_matches = [s for s in sources if s.get("score", 0) > 10.0]
+    if high_filename_matches:
+        # High filename match found - show result directly without other complex processing
+        logger.info(f"🎯 High filename similarity match (>85%) - Showing direct results from {len(high_filename_matches)} documents")
+        sources = high_filename_matches  # Use only high-confidence filename matches
         context = "\n".join([s.get("text_snippet", "") for s in sources[:7]])
+        # Set flag to skip complex processing (will be checked by router/other nodes)
+        state["high_confidence_match"] = True
     
     # Build messages with multimodal support if images are present
     if has_workflow and not has_normal:
@@ -1401,6 +1411,15 @@ async def simple_rag_node(state: AgentState):
         missing_variables=result_dict.get("missing_variables", [])
     )
     
+    # If high confidence filename match (>85%), bypass clarification and show results directly
+    if state.get("high_confidence_match", False):
+        logger.info(f"🎯 High confidence match - Bypassing clarification, showing direct answer")
+        return {
+            "final_answer": result.answer,
+            "sources": sources,
+            "images": retrieved_images
+        }
+
     if result.status == "NEEDS_CLARIFICATION":
         # Pass control to Clarifier node
         return {
