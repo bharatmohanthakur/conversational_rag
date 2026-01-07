@@ -1052,9 +1052,23 @@ async def greeting_detection_node(state: AgentState):
     """
     Detect if the user query is a greeting, casual message, or emotional expression.
     Uses LLM with Chain of Thought reasoning for ALL detection (no hardcoded patterns).
+    Also performs safety checks at entry point.
     """
     query = state["original_query"]
     user_id = state["user_id"]
+
+    # SAFETY CHECK FIRST - at entry point of conversation
+    safety_check = await check_conversation_safety(query, user_id)
+    if not safety_check.get("is_safe", True):
+        action = safety_check.get("action", "block")
+        if action in ["block", "redirect", "escalate"]:
+            logger.warning(f"🛡️ Safety concern detected: {safety_check.get('concern_type')}")
+            return {
+                "is_greeting": False,
+                "safety_block": True,
+                "safety_message": safety_check.get("message", "I can only help with HR-related questions."),
+                "safety_action": action
+            }
 
     # Skip if there's an active clarification session (don't treat clarification answers as greetings)
     active_session = clarification_tracker.get_active_session(user_id)
@@ -1331,6 +1345,213 @@ async def router_node(state: AgentState):
     import json
     result_dict = json.loads(response.content)
     return {"complexity": result_dict.get("complexity", "SIMPLE")}
+
+# Helper: User Preference Learning (ChatGPT Custom Instructions style)
+class UserPreferences:
+    """Store user preferences for personalized responses."""
+    def __init__(self):
+        self.preferences = {}  # user_id -> preferences dict
+
+    def extract_preferences_from_query(self, user_id: str, query: str, conversation_history: List[Dict]) -> Dict[str, Any]:
+        """Extract implicit preferences from user behavior."""
+        prefs = self.preferences.get(user_id, {
+            "response_style": "balanced",  # brief, balanced, detailed
+            "include_examples": True,
+            "preferred_format": "auto",  # auto, text, table, bullets
+            "language_level": "professional",  # simple, professional, technical
+            "show_sources": True,
+            "country_context": None,  # Auto-detected from queries
+            "role_context": None  # Auto-detected
+        })
+
+        # Auto-detect preferences from query patterns
+        query_lower = query.lower()
+
+        # Detect response style preference
+        if any(word in query_lower for word in ["brief", "short", "quick", "tldr"]):
+            prefs["response_style"] = "brief"
+        elif any(word in query_lower for word in ["detail", "explain", "comprehensive", "full"]):
+            prefs["response_style"] = "detailed"
+
+        # Detect format preference
+        if "table" in query_lower or "compare" in query_lower:
+            prefs["preferred_format"] = "table"
+        elif "list" in query_lower or "bullet" in query_lower:
+            prefs["preferred_format"] = "bullets"
+        elif "step" in query_lower:
+            prefs["preferred_format"] = "numbered"
+
+        # Detect context from query
+        countries = ["lebanon", "uae", "egypt", "saudi", "jordan"]
+        for country in countries:
+            if country in query_lower:
+                prefs["country_context"] = country.capitalize()
+                break
+
+        roles = ["manager", "director", "staff", "senior", "junior"]
+        for role in roles:
+            if role in query_lower:
+                prefs["role_context"] = role.capitalize()
+                break
+
+        self.preferences[user_id] = prefs
+        return prefs
+
+    def apply_preferences_to_prompt(self, base_prompt: str, preferences: Dict[str, Any]) -> str:
+        """Enhance prompt with user preferences."""
+        style_instructions = {
+            "brief": "Keep your answer brief and concise (2-3 sentences max). Focus on key points only.",
+            "balanced": "Provide a balanced answer with key information and some context.",
+            "detailed": "Provide a comprehensive, detailed answer with examples and full context."
+        }
+
+        format_instructions = {
+            "table": "If comparing multiple items, use a markdown table format.",
+            "bullets": "Format your answer using bullet points for clarity.",
+            "numbered": "Use numbered steps if describing a procedure.",
+            "text": "Use flowing paragraph text.",
+            "auto": ""  # Let LLM decide
+        }
+
+        style = preferences.get("response_style", "balanced")
+        format_pref = preferences.get("preferred_format", "auto")
+
+        enhanced_prompt = base_prompt + f"\n\n**User Preferences:**\n"
+        enhanced_prompt += f"- Response style: {style_instructions.get(style, '')}\n"
+        if format_pref != "auto":
+            enhanced_prompt += f"- Format preference: {format_instructions.get(format_pref, '')}\n"
+        if preferences.get("country_context"):
+            enhanced_prompt += f"- User context: {preferences['country_context']}\n"
+        if preferences.get("role_context"):
+            enhanced_prompt += f"- User role: {preferences['role_context']}\n"
+
+        return enhanced_prompt
+
+# Global preference manager
+user_preference_manager = UserPreferences()
+
+# Helper: Multi-Intent Detection (Gemini 2.0 style)
+async def detect_multi_intent(query: str) -> Dict[str, Any]:
+    """
+    Detect if query contains multiple separate intents/questions.
+    Example: "What's the leave policy and also how do I claim insurance?"
+    """
+    try:
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", """Detect if this query contains MULTIPLE SEPARATE questions/intents.
+
+**SINGLE INTENT** (one unified question):
+- "What is the leave policy for managers in Lebanon?" (one topic with context)
+- "How do I apply for annual leave?" (one procedure)
+- "Compare sick leave and annual leave" (one comparison task)
+
+**MULTIPLE INTENTS** (separate questions joined):
+- "What's the leave policy AND how do I claim insurance?" (2 separate topics)
+- "Tell me about benefits, also what's the dress code?" (2 unrelated questions)
+- "How many vacation days do I get and what's the bonus structure?" (2 distinct queries)
+
+Return JSON with:
+- is_multi_intent (boolean)
+- intent_count (number)
+- intents (array of strings): Individual questions extracted
+- confidence (0.0-1.0)
+
+IMPORTANT: "and" connecting parts of ONE question is NOT multi-intent."""),
+            ("user", f"Query: {query}\n\nIs this multi-intent?")
+        ])
+
+        messages = prompt.format_messages()
+        response = await agent_llm.ainvoke(
+            messages + [("system", "Respond in JSON format")]
+        )
+
+        import json
+        result = json.loads(response.content)
+        logger.info(f"Multi-intent detection: {result.get('is_multi_intent')} ({result.get('intent_count')} intents)")
+        return result
+
+    except Exception as e:
+        logger.error(f"Error detecting multi-intent: {e}")
+        return {"is_multi_intent": False, "intent_count": 1, "intents": [query], "confidence": 0.5}
+
+# Helper: Conversation Safety Guards (Claude Constitutional AI style)
+async def check_conversation_safety(query: str, user_id: str) -> Dict[str, Any]:
+    """
+    Check for safety issues: PII disclosure, inappropriate content, out-of-scope.
+    Inspired by Claude's Constitutional AI.
+    """
+    try:
+        # Quick pattern checks for PII
+        pii_patterns = [
+            r'\b\d{3}-\d{2}-\d{4}\b',  # SSN
+            r'\b\d{16}\b',  # Credit card
+            r'\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b',  # Email (not always PII but sensitive)
+            r'\b\d{10,}\b'  # Phone numbers
+        ]
+
+        import re
+        has_potential_pii = any(re.search(pattern, query, re.IGNORECASE) for pattern in pii_patterns)
+
+        if has_potential_pii:
+            return {
+                "is_safe": False,
+                "concern_type": "pii_disclosure",
+                "severity": "high",
+                "action": "block",
+                "message": "I notice your message may contain sensitive personal information. For your privacy, please don't share personal details like SSN, credit card numbers, or full contact information. How can I help you in a general way?"
+            }
+
+        # LLM-based safety check for content appropriateness
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", """You are a safety checker for an HR chatbot. Identify unsafe content.
+
+**SAFETY CONCERNS:**
+
+1. **Out of Scope** (not HR-related):
+   - Personal advice (medical, legal, financial)
+   - Non-work topics (weather, sports, personal life)
+   - Action: Politely redirect
+
+2. **Sensitive HR Topics** (requires human escalation):
+   - Harassment or discrimination claims
+   - Termination or disciplinary issues
+   - Serious workplace conflicts
+   - Action: Escalate to HR department
+
+3. **Inappropriate Requests**:
+   - Asking to bypass policies
+   - Requesting unauthorized access
+   - Manipulative or threatening language
+   - Action: Block with explanation
+
+4. **SAFE QUERIES** (answer normally):
+   - Policy questions (leave, benefits, procedures)
+   - General HR information
+   - Process clarifications
+
+Return JSON with:
+- is_safe (boolean)
+- concern_type (string): "out_of_scope" | "sensitive_topic" | "inappropriate" | "safe"
+- severity (string): "none" | "low" | "medium" | "high"
+- action (string): "answer" | "redirect" | "escalate" | "block"
+- message (string): Response to user if not safe"""),
+            ("user", f"Query: {query}\n\nSafety check:")
+        ])
+
+        messages = prompt.format_messages()
+        response = await agent_llm.ainvoke(
+            messages + [("system", "Respond in JSON format")]
+        )
+
+        import json
+        result = json.loads(response.content)
+        logger.info(f"Safety check: {result.get('concern_type')} (action: {result.get('action')})")
+        return result
+
+    except Exception as e:
+        logger.error(f"Error in safety check: {e}")
+        # Conservative: assume safe on error
+        return {"is_safe": True, "concern_type": "safe", "severity": "none", "action": "answer"}
 
 # Helper: Detect Hallucinations (Critical for RAG)
 async def detect_hallucinations(answer: str, sources: List[Dict], context: str) -> Dict[str, Any]:
@@ -2241,39 +2462,64 @@ async def clarifier_node(state: AgentState):
             "awaiting_clarification": False
         }
 
-    # Generate clarifying questions based on what's in the data (ONCE)
+    # Generate clarifying questions based on what's in the data (ONCE) - CONVERSATIONAL STYLE
     prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are an HR assistant helping to clarify a user's generic question.
+        ("system", """You are a friendly HR assistant having a natural conversation.
 
-Based on the retrieved context from our knowledge base, generate 2-4 targeted clarifying questions.
+Generate 2-4 clarifying questions in a WARM, CONVERSATIONAL tone. Not robotic.
 
-IMPORTANT RULES:
-1. Questions should be based on ACTUAL OPTIONS/CATEGORIES found in the context
-2. Questions should help narrow down exactly what the user needs
-3. Format questions as a numbered list
-4. Be specific - use real category names from the context (e.g., "health insurance", "life insurance", "dental")
-5. Keep questions concise and clear
-6. Ask questions in a logical order (e.g., country first, then position, then specific details)
+**CONVERSATIONAL GUIDELINES:**
 
-Example: If user asks "How can I benefit from insurance?" and context mentions health, life, and dental insurance:
-- What type of insurance are you interested in: health insurance, life insurance, or dental insurance?
-- Are you asking about coverage limits, enrollment process, or claim procedures?"""),
-        ("user", f"User's generic question: {query}\n\nAvailable context from knowledge base:\n{context}\n\nGenerate clarifying questions:")
+1. **Natural Language:**
+   ❌ "Which country are you located in?"
+   ✅ "I'd be happy to help! Just to make sure I give you the right information - are you asking about Lebanon, UAE, or another location?"
+
+2. **Embed Options Naturally:**
+   ❌ "Select from: A) Health B) Dental C) Life"
+   ✅ "Are you interested in health insurance, dental coverage, or life insurance benefits?"
+
+3. **Acknowledge Their Question:**
+   - Start with: "I'd be happy to help with [topic]!"
+   - Or: "Great question about [topic]!"
+   - Show you heard them
+
+4. **Conversational Flow:**
+   - Use "just to make sure", "to give you accurate info", "so I can help better"
+   - Avoid: "Please specify", "Select option", "Provide details"
+   - Use natural connectors: "and also", "or did you mean", "I want to make sure"
+
+5. **Examples:**
+   Query: "How can I benefit from insurance?"
+
+   ❌ ROBOTIC: "1. Which insurance type? 2. What information needed?"
+
+   ✅ CONVERSATIONAL:
+   "I'd be happy to help you with insurance benefits! Just to make sure I point you to the right information:
+   - Are you interested in health insurance, life insurance, or dental coverage?
+   - Are you looking for coverage details, how to enroll, or how to file a claim?"
+
+6. **Keep It Brief:** Each question should be one sentence, max 20 words
+
+Return JSON with:
+- intro (string): Warm opening (e.g., "I'd be happy to help with leave policy!")
+- questions (array): 2-4 conversational questions
+- tone (string): "friendly", "professional", or "casual" based on user's query"""),
+        ("user", f"User's question: {query}\n\nAvailable context:\n{context[:800]}\n\nGenerate warm, conversational clarifying questions:")
     ])
 
     # Use JSON mode instead of structured output for compatibility
-    messages = prompt.format_messages(query=query, context=context)
+    messages = prompt.format_messages()
     response = await agent_llm.ainvoke(
-        messages + [("system", "Respond in JSON format with fields: questions (array of strings), categories_found (array of strings)")]
+        messages + [("system", "Respond in JSON format with fields: intro (string), questions (array of strings), tone (string)")]
     )
 
     # Parse JSON response
     import json
     result_dict = json.loads(response.content)
 
-    # Extract questions from response
+    # Extract questions and intro from response
+    intro = result_dict.get("intro", "I'd be happy to help!")
     questions = result_dict.get("questions", [])
-    categories_found = result_dict.get("categories_found", [])
 
     # Create clarification session to track this (ONCE - questions are fixed now)
     session = clarification_tracker.create_session(
@@ -2285,9 +2531,9 @@ Example: If user asks "How can I benefit from insurance?" and context mentions h
         metadata={"request_id": state.get("request_id")}
     )
 
-    # Format ALL clarifying questions as the response (first time)
-    questions_text = "\n".join([f"{i+1}. {q}" for i, q in enumerate(questions, start=1)])
-    response_text = f"To help you better, I need a bit more information:\n\n{questions_text}\n\nPlease provide your answers and I'll give you a detailed response."
+    # Format ALL clarifying questions as the response (first time) - CONVERSATIONAL
+    questions_text = "\n".join([f"- {q}" for q in questions])  # Use bullets instead of numbers for friendliness
+    response_text = f"{intro}\n\n{questions_text}"
     
     logger.info(f"Created NEW clarification session for {user_id} with {len(questions)} questions")
 
