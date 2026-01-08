@@ -219,6 +219,47 @@ class UserProfileTracker:
         # Increment conversation count
         profile.conversation_count += 1
 
+    def update_from_query(
+        self,
+        user_id: str,
+        query: str,
+        conversation_history: Optional[List[Dict[str, Any]]] = None
+    ):
+        """
+        Update user profile by extracting information from query and conversation history.
+
+        Args:
+            user_id: User identifier
+            query: Current user query
+            conversation_history: Optional conversation history
+        """
+        profile = self.get_profile(user_id)
+
+        # Extract from current query
+        extracted = self.extract_from_text(query, user_id)
+
+        # Also extract from recent conversation history
+        if conversation_history:
+            for msg in conversation_history[-10:]:  # Last 10 messages
+                if msg.get("role") == "user":
+                    hist_extracted = self.extract_from_text(msg.get("content", ""), user_id)
+                    # Merge extracted info (query takes precedence)
+                    for key, value in hist_extracted.items():
+                        if key not in extracted:
+                            extracted[key] = value
+
+        # Update profile with extracted info
+        updated = False
+        for key, value in extracted.items():
+            if hasattr(profile, key) and getattr(profile, key) is None:
+                setattr(profile, key, value)
+                updated = True
+                logger.info(f"Extracted {key}={value} for user {user_id}")
+
+        if updated:
+            profile.last_updated = datetime.now().isoformat()
+            self._save_profile(profile)
+
     def add_topic(self, user_id: str, topic: str):
         """
         Add a discussed topic to profile.
