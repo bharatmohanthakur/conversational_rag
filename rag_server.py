@@ -55,7 +55,7 @@ from conversational_excellence import ConversationalExcellence
 # Optimization modules
 from config import get_config, get_query_processing_config
 from query_cache import init_query_cache, get_query_cache
-from pattern_matcher import init_pattern_matcher, get_pattern_matcher
+from pattern_matcher import get_pattern_matcher
 from best_guess_answering import BestGuessAnswering
 from user_profile_tracker import UserProfileTracker
 from topic_change_detector import TopicChangeDetector
@@ -232,8 +232,8 @@ def get_enhanced_components():
         _adaptive_retriever = AdaptiveRetriever(retrieval_function=retrieval_func)
 
         # Initialize optimization modules
-        # 1. Initialize global singletons (pattern_matcher, query_cache, query_processor)
-        init_pattern_matcher()
+        # 1. Initialize global singletons (query_cache, query_processor)
+        # Note: pattern_matcher auto-initializes through get_pattern_matcher()
 
         # Simple embedding function for cache (using Azure OpenAI)
         def embed_query(text: str):
