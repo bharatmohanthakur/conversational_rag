@@ -364,9 +364,9 @@ class QueryResponse(BaseModel):
 # Conversation Management (Persistent Storage)
 # ---------------------------------------------------------------------
 # Get enhanced components
-(conv_manager, clarification_tracker, conversation_summarizer, self_evaluator, 
- quality_gate, adaptive_retriever, contextual_compressor, 
- reranker, corrective_rag) = get_enhanced_components()
+(conv_manager, clarification_tracker, conversation_summarizer, self_evaluator,
+ quality_gate, adaptive_retriever, contextual_compressor,
+ reranker, corrective_rag, general_query_handler) = get_enhanced_components()
 
 def get_user_history(user_id: str, use_summarization: bool = True) -> List[Dict[str, str]]:
     """
