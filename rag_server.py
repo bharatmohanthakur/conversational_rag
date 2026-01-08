@@ -261,7 +261,9 @@ def get_enhanced_components():
             deployment_name=AZURE_CHAT_DEPLOYMENT
         )
 
-        _user_profile_tracker = UserProfileTracker()
+        _user_profile_tracker = UserProfileTracker(
+            conversation_manager=_conv_manager
+        )
 
         _topic_change_detector = TopicChangeDetector(
             embedding_function=embed_query
