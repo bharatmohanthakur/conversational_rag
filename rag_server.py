@@ -52,6 +52,17 @@ from corrective_rag import CorrectiveRAG
 from general_query_handler import GeneralQueryHandler, QueryType
 from conversational_excellence import ConversationalExcellence
 
+# Optimization modules
+from config import get_config, get_query_processing_config
+from query_cache import init_query_cache, get_query_cache
+from pattern_matcher import init_pattern_matcher, get_pattern_matcher
+from best_guess_answering import BestGuessAnswering
+from user_profile_tracker import UserProfileTracker
+from topic_change_detector import TopicChangeDetector
+from conversation_state_machine import ConversationStateMachine, ConversationState
+from clarification_handler import ClarificationHandler
+from optimized_query_processor import init_query_processor, get_query_processor
+
 # Graphiti imports
 from graphiti_core import Graphiti
 from graphiti_core.driver.neo4j_driver import Neo4jDriver
@@ -180,11 +191,20 @@ _corrective_rag = None
 _general_query_handler = None
 _conversational_excellence = None
 
+# Optimization modules
+_best_guess_answering = None
+_user_profile_tracker = None
+_topic_change_detector = None
+_conversation_state_machine = None
+_unified_clarification_handler = None
+
 def get_enhanced_components():
     """Get or initialize enhanced components."""
     global _conv_manager, _clarification_tracker, _conversation_summarizer
     global _self_evaluator, _adaptive_retriever, _quality_gate
     global _contextual_compressor, _reranker, _corrective_rag, _general_query_handler, _conversational_excellence
+    global _best_guess_answering, _user_profile_tracker, _topic_change_detector
+    global _conversation_state_machine, _unified_clarification_handler
     if _conv_manager is None:
         _conv_manager = get_conversation_manager()
         _clarification_tracker = ClarificationTracker(_conv_manager)
@@ -210,9 +230,56 @@ def get_enhanced_components():
         async def retrieval_func(query: str, user_id: str):
             return await run_search_for_deep_agent(query, user_id, use_adaptive=False)
         _adaptive_retriever = AdaptiveRetriever(retrieval_function=retrieval_func)
+
+        # Initialize optimization modules
+        # 1. Initialize global singletons (pattern_matcher, query_cache, query_processor)
+        init_pattern_matcher()
+
+        # Simple embedding function for cache (using Azure OpenAI)
+        def embed_query(text: str):
+            response = aoai_client.embeddings.create(
+                model=AZURE_EMBEDDING_DEPLOYMENT,
+                input=text
+            )
+            return response.data[0].embedding
+
+        init_query_cache(
+            embedding_function=embed_query,
+            ttl_seconds=3600,
+            max_size=1000,
+            similarity_threshold=0.95
+        )
+
+        init_query_processor(
+            llm_client=aoai_client,
+            deployment_name=AZURE_CHAT_DEPLOYMENT
+        )
+
+        # 2. Initialize optimization components
+        _best_guess_answering = BestGuessAnswering(
+            llm_client=aoai_client,
+            deployment_name=AZURE_CHAT_DEPLOYMENT
+        )
+
+        _user_profile_tracker = UserProfileTracker()
+
+        _topic_change_detector = TopicChangeDetector(
+            embedding_function=embed_query
+        )
+
+        _conversation_state_machine = ConversationStateMachine()
+
+        _unified_clarification_handler = ClarificationHandler(
+            llm_client=aoai_client,
+            deployment_name=AZURE_CHAT_DEPLOYMENT,
+            clarification_tracker=_clarification_tracker
+        )
+
     return (_conv_manager, _clarification_tracker, _conversation_summarizer, _self_evaluator,
             _quality_gate, _adaptive_retriever, _contextual_compressor,
-            _reranker, _corrective_rag, _general_query_handler, _conversational_excellence)
+            _reranker, _corrective_rag, _general_query_handler, _conversational_excellence,
+            _best_guess_answering, _user_profile_tracker, _topic_change_detector,
+            _conversation_state_machine, _unified_clarification_handler)
 
 # ---------------------------------------------------------------------
 # Graphiti Memory System
@@ -374,7 +441,9 @@ class QueryResponse(BaseModel):
 # Get enhanced components
 (conv_manager, clarification_tracker, conversation_summarizer, self_evaluator,
  quality_gate, adaptive_retriever, contextual_compressor,
- reranker, corrective_rag, general_query_handler, conversational_excellence) = get_enhanced_components()
+ reranker, corrective_rag, general_query_handler, conversational_excellence,
+ best_guess_answering, user_profile_tracker, topic_change_detector,
+ conversation_state_machine, unified_clarification_handler) = get_enhanced_components()
 
 def get_user_history(user_id: str, use_summarization: bool = True) -> List[Dict[str, str]]:
     """
@@ -2386,17 +2455,27 @@ async def query_endpoint(request: QueryRequest):
 
         log_request(request_id, "🤖 QUERY_START", {"query": query_text})
 
-        # Get enhanced components including general query handler
+        # Get enhanced components including general query handler and optimization modules
         components = get_enhanced_components()
-        general_query_handler = components[-2]  # Second to last
-        conversational_excellence_instance = components[-1]  # Last item in tuple
+        # Unpack: conv_manager, clarification_tracker, conversation_summarizer, self_evaluator,
+        #         quality_gate, adaptive_retriever, contextual_compressor,
+        #         reranker, corrective_rag, general_query_handler, conversational_excellence,
+        #         best_guess_answering, user_profile_tracker, topic_change_detector,
+        #         conversation_state_machine, unified_clarification_handler
+        general_query_handler_instance = components[9]
+        conversational_excellence_instance = components[10]
+        best_guess_answering_instance = components[11]
+        user_profile_tracker_instance = components[12]
+        topic_change_detector_instance = components[13]
+        conversation_state_machine_instance = components[14]
+        unified_clarification_handler_instance = components[15]
 
         # Get conversation history for context-aware classification
         history = get_user_history(user_id)
 
         # === NEW: Check if this is a general conversational query (not knowledge-based) ===
         # Use LLM-based classification instead of hardcoded patterns
-        general_response = general_query_handler.handle_query(
+        general_response = general_query_handler_instance.handle_query(
             query=query_text,
             conversation_history=history,
             confidence_threshold=0.7
@@ -2532,6 +2611,7 @@ async def query_endpoint(request: QueryRequest):
         # Mark new questions (not clarification responses) as original questions
         is_clarification_answer = clarification_tracker.get_active_session(user_id) and \
                                  clarification_tracker.is_clarification_response(user_id, query_text)
+        is_obvious_greeting = is_greeting_or_casual(query_text)
 
         metadata = {"request_id": request_id}
         if not is_clarification_answer and not is_obvious_greeting:
