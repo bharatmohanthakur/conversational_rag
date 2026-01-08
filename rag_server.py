@@ -49,6 +49,7 @@ from conversation_summarizer import ConversationSummarizer
 from contextual_compressor import ContextualCompressor
 from reranker import Reranker
 from corrective_rag import CorrectiveRAG
+from general_query_handler import GeneralQueryHandler, QueryType
 
 # Graphiti imports
 from graphiti_core import Graphiti
@@ -175,12 +176,13 @@ _quality_gate = None
 _contextual_compressor = None
 _reranker = None
 _corrective_rag = None
+_general_query_handler = None
 
 def get_enhanced_components():
     """Get or initialize enhanced components."""
     global _conv_manager, _clarification_tracker, _conversation_summarizer
     global _self_evaluator, _adaptive_retriever, _quality_gate
-    global _contextual_compressor, _reranker, _corrective_rag
+    global _contextual_compressor, _reranker, _corrective_rag, _general_query_handler
     if _conv_manager is None:
         _conv_manager = get_conversation_manager()
         _clarification_tracker = ClarificationTracker(_conv_manager)
@@ -191,13 +193,18 @@ def get_enhanced_components():
         _contextual_compressor = ContextualCompressor(aoai_client, deployment_name=AZURE_CHAT_DEPLOYMENT)
         _reranker = Reranker(aoai_client, deployment_name=AZURE_CHAT_DEPLOYMENT)
         _corrective_rag = CorrectiveRAG(aoai_client, deployment_name=AZURE_CHAT_DEPLOYMENT)
+        # Initialize general query handler for conversational queries
+        _general_query_handler = GeneralQueryHandler(
+            llm_client=aoai_client,
+            deployment_name=AZURE_CHAT_DEPLOYMENT
+        )
         # Initialize adaptive retriever with run_search_for_deep_agent as retrieval function
         async def retrieval_func(query: str, user_id: str):
             return await run_search_for_deep_agent(query, user_id, use_adaptive=False)
         _adaptive_retriever = AdaptiveRetriever(retrieval_function=retrieval_func)
-    return (_conv_manager, _clarification_tracker, _conversation_summarizer, _self_evaluator, 
-            _quality_gate, _adaptive_retriever, _contextual_compressor, 
-            _reranker, _corrective_rag)
+    return (_conv_manager, _clarification_tracker, _conversation_summarizer, _self_evaluator,
+            _quality_gate, _adaptive_retriever, _contextual_compressor,
+            _reranker, _corrective_rag, _general_query_handler)
 
 # ---------------------------------------------------------------------
 # Graphiti Memory System
@@ -1763,15 +1770,16 @@ async def clarification_answer_handler_node(state: AgentState):
     
     # Not enough info yet - ask remaining questions
     missing = session.get_missing_questions()
-    remaining_questions = [session.questions_asked[i] for i in missing]
-    
+    remaining_questions = [(i, session.questions_asked[i]) for i in missing]
+
     if remaining_questions:
-        questions_text = "\n".join([f"{i+1}. {q}" for i, q in enumerate(remaining_questions, start=1)])
+        # Use actual indices (i+1) instead of re-numbering from 1
+        questions_text = "\n".join([f"{idx+1}. {q}" for idx, q in remaining_questions])
         response_text = f"To help you better, I need a bit more information:\n\n{questions_text}\n\nPlease provide your answers and I'll give you a detailed response."
         
         return {
             "final_answer": response_text,
-            "clarifying_questions": remaining_questions,
+            "clarifying_questions": [q for idx, q in remaining_questions],
             "awaiting_clarification": True,
             "sources": session.sources
         }
@@ -2347,49 +2355,88 @@ async def query_endpoint(request: QueryRequest):
     try:
         query_text = request.query.strip()
         user_id = request.user_id or "default_user"
-        
+
+        log_request(request_id, "🤖 QUERY_START", {"query": query_text})
+
+        # Get enhanced components including general query handler
+        components = get_enhanced_components()
+        general_query_handler = components[-1]  # Last item in tuple
+
+        # Get conversation history for context-aware classification
+        history = get_user_history(user_id)
+
+        # === NEW: Check if this is a general conversational query (not knowledge-based) ===
+        # Use LLM-based classification instead of hardcoded patterns
+        general_response = general_query_handler.handle_query(
+            query=query_text,
+            conversation_history=history,
+            confidence_threshold=0.7
+        )
+
+        if general_response is not None:
+            # This is a general conversational query - respond directly without RAG
+            log_request(request_id, "💬 GENERAL_QUERY", {
+                "query": query_text,
+                "bypassed_rag": True
+            })
+
+            total_elapsed = (datetime.now() - start_time).total_seconds()
+
+            # Save to conversation history
+            conv_manager.add_message(user_id, "user", query_text, {
+                "request_id": request_id,
+                "query_type": "general_conversational"
+            })
+
+            conv_manager.add_message(user_id, "assistant", general_response, {
+                "request_id": request_id,
+                "query_type": "general_conversational",
+                "elapsed_sec": round(total_elapsed, 3)
+            })
+
+            log_request(request_id, "✅ GENERAL_QUERY_COMPLETE", {
+                "elapsed_sec": round(total_elapsed, 3),
+                "response_length": len(general_response)
+            })
+
+            # Return response directly
+            return QueryResponse(
+                response=format_gfm_to_html(general_response),
+                metadata={
+                    "request_id": request_id,
+                    "query_type": "general_conversational",
+                    "bypassed_rag": True,
+                    "elapsed_sec": round(total_elapsed, 3)
+                }
+            )
+
+        # === If not general query, proceed with normal RAG flow ===
         log_request(request_id, "🤖 DEEP_AGENT_START", {"query": query_text})
 
-        # Fast path: Check for obvious greetings first (skip expensive operations)
-        query_lower = query_text.lower().strip()
-        obvious_greetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening", 
-                           "thanks", "thank you", "okay", "ok", "sure", "great", "awesome", "perfect"]
-        is_obvious_greeting = any(greeting == query_lower or query_lower.startswith(greeting + " ") 
-                                 for greeting in obvious_greetings) and len(query_text.split()) <= 5
-        
-        if is_obvious_greeting:
-            # Fast path: Skip query rewriting and history for obvious greetings
-            logger.info(f"Fast path: Obvious greeting detected, skipping query rewrite and history")
-            rewritten_query = query_text
+        # Check for active clarification session FIRST (before rewriting)
+        active_session = clarification_tracker.get_active_session(user_id)
+
+        # Check if this is actually a clarification answer or a new question
+        is_clarification = active_session and clarification_tracker.is_clarification_response(user_id, query_text)
+
+        if is_clarification:
+            # User is answering a clarifying question - don't rewrite, use original query
+            logger.info(f"User {user_id} is answering clarification question")
+            rewritten_query = query_text  # Use original query for clarification handler
         else:
-            # Check for active clarification session FIRST (before rewriting)
-            active_session = clarification_tracker.get_active_session(user_id)
-            
-            # Check if this is actually a clarification answer or a new question
-            is_clarification = active_session and clarification_tracker.is_clarification_response(user_id, query_text)
-            
-            if is_clarification:
-                # User is answering a clarifying question - don't rewrite, use original query
-                logger.info(f"User {user_id} is answering clarification question")
-                rewritten_query = query_text  # Use original query for clarification handler
-            else:
-                # This is a new question - abandon any active clarification session
-                if active_session:
-                    clarification_tracker.abandon_session(user_id)
-                    logger.info(f"Abandoned clarification session for {user_id} - new question detected: '{query_text[:50]}'")
-                
-                # Normal flow - rewrite query with history (greetings filtered out)
-                history = get_user_history(user_id)
-                rewritten_query = rewrite_query_with_history(history, query_text, user_id)
+            # This is a new question - abandon any active clarification session
+            if active_session:
+                clarification_tracker.abandon_session(user_id)
+                logger.info(f"Abandoned clarification session for {user_id} - new question detected: '{query_text[:50]}'")
+
+            # Normal flow - rewrite query with history
+            rewritten_query = rewrite_query_with_history(history, query_text, user_id)
         
         if rewritten_query != query_text:
             log_request(request_id, "🔄 DEEP_QUERY_REWRITE", {
                 "original": query_text,
                 "rewritten": rewritten_query
             })
-        
-        # Get history for previous_response extraction
-        history = get_user_history(user_id)
 
         # Extract previous assistant response for FORMAT path
         previous_response = ""
