@@ -403,7 +403,7 @@ When answering:
 def rewrite_query_with_history(history: List[Dict[str, str]], latest_query: str, user_id: str = None) -> str:
     """
     Rewrites the latest query based on conversation history to make it standalone.
-    Enhanced to handle clarification context.
+    Enhanced to handle clarification context and preserve original question intent.
     """
     # Check for active clarification session first
     if user_id:
@@ -416,29 +416,35 @@ def rewrite_query_with_history(history: List[Dict[str, str]], latest_query: str,
                 # Just return the query as-is, it will be handled by clarification_answer_handler_node
                 logger.info(f"Query rewrite: Detected clarification response, keeping query as-is for clarification handler")
                 return latest_query  # Keep as-is, will be handled by clarification handler
-    
+
     if not history:
         return latest_query
+
+    # Extract original question from conversation history
+    original_question = None
+    if user_id:
+        conv_mgr = get_conversation_manager()
+        original_question = conv_mgr.get_original_question(user_id, within_last_n=15)
 
     # Filter out greetings and casual messages from history
     # Only include messages that are actual HR questions/answers
     filtered_history = []
     greeting_patterns = ["hi", "hello", "hey", "thanks", "thank you", "okay", "ok", "sure", "great", "awesome", "perfect"]
-    
+
     for msg in history[-10:]:
         role = msg.get("role", "unknown")
         content = msg.get("content", "").strip().lower()
-        
+
         # Skip greetings and casual messages
         if role == "user":
             # Check if it's a greeting/casual message
             is_greeting = any(pattern in content for pattern in greeting_patterns) and len(content.split()) <= 5
             if is_greeting:
                 continue  # Skip greetings
-        
+
         # Include assistant responses and actual user questions
         filtered_history.append(msg)
-    
+
     if not filtered_history:
         return latest_query
 
@@ -449,23 +455,26 @@ def rewrite_query_with_history(history: List[Dict[str, str]], latest_query: str,
         content = msg.get("content", "")
         history_str += f"{role}: {content}\n"
 
+    # Build prompt with original question context if available
+    original_context = f"\n**IMPORTANT - Original Question**: {original_question}\n" if original_question else ""
+
     prompt = f"""You are an AI assistant. Your task is to rewrite the latest user question into a standalone question.
-    
+{original_context}
 Rules:
-1. **Ignore Greetings**: Do NOT include greetings (hi, hello, thanks) in the rewritten query. Only use actual HR questions.
-2. **Focus on the Immediate Context**: If the user is answering a clarifying question, combine their answer with the original question.
-3. **Maintain the Core Topic**: If the user asks a follow-up (e.g., "What about..."), apply it to the MAIN TOPIC discussed in previous turns (e.g., "SaaS Procurement").
-4. **Resolve Pronouns**: Resolve 'it', 'they', 'that' to their referents.
-5. **Preserve Clarification Context**: If previous messages show clarifying questions were asked, combine the original query with the answers.
-6. **Do Not Hallucinate**: Only use info present in the history.
-7. **Do NOT include greetings or casual messages**: If the latest query is a greeting, return it as-is. If history only contains greetings, return the latest query as-is.
+1. **Preserve Original Intent**: If there is an original question provided above, ALWAYS maintain its core intent. The latest query is likely a follow-up or clarification answer related to this original question.
+2. **Ignore Greetings**: Do NOT include greetings (hi, hello, thanks) in the rewritten query. Only use actual HR questions.
+3. **Handle Clarification Answers**: If the user is answering a clarifying question, combine their answer with the ORIGINAL QUESTION (not just the immediate clarification).
+4. **Maintain Core Topic**: If the user asks a follow-up (e.g., "What about..."), apply it to the ORIGINAL QUESTION's topic.
+5. **Resolve Pronouns**: Resolve 'it', 'they', 'that' to their referents from the ORIGINAL QUESTION.
+6. **Context Over Recency**: Prioritize the original question's context over the immediate recent exchange.
+7. **Do Not Hallucinate**: Only use info present in the history.
 
 Conversation History (greetings filtered out):
 {history_str}
 
-Latest User Question: {latest_query}
+Latest User Input: {latest_query}
 
-Standalone Question:"""
+Standalone Question (maintaining original intent):"""
 
     try:
         response = aoai_client.chat.completions.create(
@@ -477,7 +486,13 @@ Standalone Question:"""
         rewritten = response.choices[0].message.content.strip()
         if rewritten.startswith('"') and rewritten.endswith('"'):
             rewritten = rewritten[1:-1]
-            
+
+        # If we have an original question and the rewritten query lost the context, add it back
+        if original_question and len(rewritten.split()) < 5:
+            logger.warning(f"Query rewrite seems too short, using original question as base")
+            # Combine the short answer with the original question
+            rewritten = f"{original_question} - {latest_query}"
+
         return rewritten
     except Exception as e:
         logger.error(f"Error rewriting query: {e}")
@@ -2438,8 +2453,17 @@ async def query_endpoint(request: QueryRequest):
         })
 
         # Update persistent conversation history
-        conv_manager.add_message(user_id, "user", query_text, {"request_id": request_id})
-        
+        # Mark new questions (not clarification responses) as original questions
+        is_clarification_answer = clarification_tracker.get_active_session(user_id) and \
+                                 clarification_tracker.is_clarification_response(user_id, query_text)
+
+        metadata = {"request_id": request_id}
+        if not is_clarification_answer and not is_obvious_greeting:
+            # This is a new question - mark it as the original question
+            metadata["is_original_question"] = True
+
+        conv_manager.add_message(user_id, "user", query_text, metadata)
+
         # Assess answer quality
         sources = result.get("sources", [])
         graphiti_facts = []  # Will be populated if Graphiti is used
