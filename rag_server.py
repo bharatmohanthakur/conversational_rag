@@ -50,6 +50,7 @@ from contextual_compressor import ContextualCompressor
 from reranker import Reranker
 from corrective_rag import CorrectiveRAG
 from general_query_handler import GeneralQueryHandler, QueryType
+from conversational_excellence import ConversationalExcellence
 
 # Graphiti imports
 from graphiti_core import Graphiti
@@ -177,12 +178,13 @@ _contextual_compressor = None
 _reranker = None
 _corrective_rag = None
 _general_query_handler = None
+_conversational_excellence = None
 
 def get_enhanced_components():
     """Get or initialize enhanced components."""
     global _conv_manager, _clarification_tracker, _conversation_summarizer
     global _self_evaluator, _adaptive_retriever, _quality_gate
-    global _contextual_compressor, _reranker, _corrective_rag, _general_query_handler
+    global _contextual_compressor, _reranker, _corrective_rag, _general_query_handler, _conversational_excellence
     if _conv_manager is None:
         _conv_manager = get_conversation_manager()
         _clarification_tracker = ClarificationTracker(_conv_manager)
@@ -198,13 +200,19 @@ def get_enhanced_components():
             llm_client=aoai_client,
             deployment_name=AZURE_CHAT_DEPLOYMENT
         )
+        # Initialize conversational excellence for natural responses
+        _conversational_excellence = ConversationalExcellence(
+            llm_client=aoai_client,
+            deployment_name=AZURE_CHAT_DEPLOYMENT,
+            personality="warm_professional"
+        )
         # Initialize adaptive retriever with run_search_for_deep_agent as retrieval function
         async def retrieval_func(query: str, user_id: str):
             return await run_search_for_deep_agent(query, user_id, use_adaptive=False)
         _adaptive_retriever = AdaptiveRetriever(retrieval_function=retrieval_func)
     return (_conv_manager, _clarification_tracker, _conversation_summarizer, _self_evaluator,
             _quality_gate, _adaptive_retriever, _contextual_compressor,
-            _reranker, _corrective_rag, _general_query_handler)
+            _reranker, _corrective_rag, _general_query_handler, _conversational_excellence)
 
 # ---------------------------------------------------------------------
 # Graphiti Memory System
@@ -366,7 +374,7 @@ class QueryResponse(BaseModel):
 # Get enhanced components
 (conv_manager, clarification_tracker, conversation_summarizer, self_evaluator,
  quality_gate, adaptive_retriever, contextual_compressor,
- reranker, corrective_rag, general_query_handler) = get_enhanced_components()
+ reranker, corrective_rag, general_query_handler, conversational_excellence) = get_enhanced_components()
 
 def get_user_history(user_id: str, use_summarization: bool = True) -> List[Dict[str, str]]:
     """
@@ -2360,7 +2368,8 @@ async def query_endpoint(request: QueryRequest):
 
         # Get enhanced components including general query handler
         components = get_enhanced_components()
-        general_query_handler = components[-1]  # Last item in tuple
+        general_query_handler = components[-2]  # Second to last
+        conversational_excellence_instance = components[-1]  # Last item in tuple
 
         # Get conversation history for context-aware classification
         history = get_user_history(user_id)
@@ -2520,16 +2529,48 @@ async def query_endpoint(request: QueryRequest):
             graphiti_facts,
             query_text
         )
-        
+
+        # === NEW: Enhance response for natural conversation ===
+        # Get conversation context
+        conv_context = conversational_excellence_instance.get_or_create_context(
+            user_id=user_id,
+            conversation_history=history
+        )
+
+        # Enhance the response to be more natural, contextual, and conversational
+        enhancement = conversational_excellence_instance.enhance_response(
+            original_response=answer_text,
+            user_query=query_text,
+            context=conv_context,
+            metadata={
+                "confidence": quality_assessment["confidence"]["score"],
+                "sources": sources,
+                "complexity": complexity
+            }
+        )
+
+        # Use enhanced response
+        final_answer = enhancement.enhanced_response
+
+        # Update context
+        conversational_excellence_instance.update_context_from_interaction(
+            user_query=query_text,
+            response=final_answer,
+            context=conv_context
+        )
+
+        logger.info(f"Response enhanced: {len(enhancement.improvements_made)} improvements made")
+
         # Save assistant response with quality metadata
         conv_manager.add_message(
-            user_id, 
-            "assistant", 
-            answer_text,
+            user_id,
+            "assistant",
+            final_answer,  # Use enhanced response
             {
                 "request_id": request_id,
                 "complexity": complexity,
-                "quality": quality_assessment
+                "quality": quality_assessment,
+                "conversational_enhancements": enhancement.improvements_made
             }
         )
 
@@ -2552,7 +2593,7 @@ async def query_endpoint(request: QueryRequest):
         }
         
         return QueryResponse(
-            response=format_gfm_to_html(answer_text),
+            response=format_gfm_to_html(final_answer),  # Use enhanced response
             metadata=metadata
         )
         
