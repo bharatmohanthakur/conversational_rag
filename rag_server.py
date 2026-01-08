@@ -1522,13 +1522,40 @@ async def clarifier_node(state: AgentState):
     For GENERIC queries: Fetch initial RAG data, analyze what options/categories exist,
     and generate targeted clarifying questions based on available data.
     Now creates a clarification session to track context.
-    
+
     IMPORTANT: Questions are generated ONCE and stored in session. If session already exists,
     we reuse the existing questions instead of regenerating.
+
+    GOLDEN RULE: Enforced by conversation_state_machine - max 1 clarification per conversation.
     """
     query = state["original_query"]
     user_id = state["user_id"]
-    
+
+    # Check conversation state machine - enforce golden rules
+    # If we've already asked clarification before, skip and answer directly
+    if conversation_state_machine.has_clarified(user_id):
+        logger.info(f"⚠️ Golden rule enforced: Already clarified once for {user_id}, answering directly without clarification")
+        # Answer directly without clarification - use best-guess answering
+        search_result = await run_search_for_deep_agent(query, user_id)
+        context = search_result.get("context", "")
+        sources = search_result.get("sources", [])
+
+        messages = [
+            ("system", "You are a helpful HR assistant. Answer the user's question based on the context provided."),
+            ("user", f"Question: {query}\n\nContext:\n{context}\n\nProvide a comprehensive answer.")
+        ]
+        response = await agent_llm.ainvoke(messages)
+        answer_text = response.content
+
+        return {
+            "final_answer": answer_text,
+            "sources": sources,
+            "awaiting_clarification": False
+        }
+
+    # Update state machine - transitioning to clarification
+    conversation_state_machine.transition_to_clarifying(user_id)
+
     # Check if there's already an active clarification session
     existing_session = clarification_tracker.get_active_session(user_id)
     if existing_session:
@@ -1565,8 +1592,12 @@ async def clarifier_node(state: AgentState):
             ]
             response = await agent_llm.ainvoke(messages)
             answer_text = response.content
-            
+
             clarification_tracker.complete_session(user_id)
+            # Mark clarification as completed in state machine (for golden rule enforcement)
+            conversation_state_machine.mark_clarification_done(user_id)
+            conversation_state_machine.transition_to_answering(user_id)
+
             return {
                 "final_answer": answer_text,
                 "sources": sources,
@@ -1608,8 +1639,12 @@ async def clarifier_node(state: AgentState):
             ]
             response = await agent_llm.ainvoke(messages)
             answer_text = response.content
-            
+
             clarification_tracker.complete_session(user_id)
+            # Mark clarification as completed in state machine (for golden rule enforcement)
+            conversation_state_machine.mark_clarification_done(user_id)
+            conversation_state_machine.transition_to_answering(user_id)
+
             return {
                 "final_answer": answer_text,
                 "sources": sources,
@@ -1795,10 +1830,13 @@ async def clarification_answer_handler_node(state: AgentState):
         ]
         response = await agent_llm.ainvoke(messages)
         answer_text = response.content
-        
+
         # Complete session
         clarification_tracker.complete_session(user_id)
-        
+        # Mark clarification as completed in state machine (for golden rule enforcement)
+        conversation_state_machine.mark_clarification_done(user_id)
+        conversation_state_machine.transition_to_answering(user_id)
+
         return {
             "final_answer": answer_text,
             "sources": sources,
@@ -2473,6 +2511,48 @@ async def query_endpoint(request: QueryRequest):
         # Get conversation history for context-aware classification
         history = get_user_history(user_id)
 
+        # ============================================================================
+        # OPTIMIZATION LAYER: User Profile, Topic Detection, State Management
+        # ============================================================================
+
+        # 1. Extract and remember user context (role, country, department)
+        user_profile_tracker_instance.update_from_query(
+            user_id=user_id,
+            query=query_text,
+            conversation_history=history
+        )
+        user_profile = user_profile_tracker_instance.get_profile(user_id)
+        logger.info(f"👤 User profile for {user_id}: {user_profile}")
+
+        # 2. Detect topic changes for smooth transitions
+        if len(history) > 0:
+            # Get last user message
+            last_user_messages = [m for m in history if m.get("role") == "user"]
+            if last_user_messages:
+                last_query = last_user_messages[-1].get("content", "")
+                topic_transition = topic_change_detector_instance.detect_transition(
+                    previous_query=last_query,
+                    current_query=query_text,
+                    conversation_history=history
+                )
+                logger.info(f"🔄 Topic transition: {topic_transition}")
+
+                # Add acknowledgment if topic changed
+                if topic_transition.changed and topic_transition.acknowledgment:
+                    # Store acknowledgment to prepend to response later
+                    topic_acknowledgment = topic_transition.acknowledgment
+                else:
+                    topic_acknowledgment = None
+            else:
+                topic_acknowledgment = None
+        else:
+            topic_acknowledgment = None
+
+        # 3. Update conversation state machine
+        conversation_state_machine_instance.transition_to_answering(user_id)
+        current_state = conversation_state_machine_instance.get_state(user_id)
+        logger.info(f"🎯 Conversation state: {current_state}")
+
         # === NEW: Check if this is a general conversational query (not knowledge-based) ===
         # Use LLM-based classification instead of hardcoded patterns
         general_response = general_query_handler_instance.handle_query(
@@ -2580,7 +2660,10 @@ async def query_endpoint(request: QueryRequest):
             "original_user_query": original_user_query,
             # Greeting detection fields
             "is_greeting": False,  # Initialize to False, will be set by greeting_detection_node
-            "greeting_type": None
+            "greeting_type": None,
+            # Optimization layer data
+            "user_profile": user_profile,  # Pass user context to RAG system
+            "topic_acknowledgment": topic_acknowledgment  # Topic transition acknowledgment
         }
         
         # Invoke LangGraph
@@ -2595,6 +2678,9 @@ async def query_endpoint(request: QueryRequest):
                 # Extract user_id from session_id (format: user_id_timestamp)
                 user_id_from_session = session_id.rsplit("_", 2)[0] if "_" in session_id else user_id
                 clarification_tracker.complete_session(user_id_from_session)
+                # Mark clarification as completed in state machine (for golden rule enforcement)
+                conversation_state_machine.mark_clarification_done(user_id_from_session)
+                conversation_state_machine.transition_to_answering(user_id_from_session)
                 logger.info(f"Completed clarification session for {user_id_from_session} after turn 3")
         
         # Log & Save History
@@ -2651,6 +2737,11 @@ async def query_endpoint(request: QueryRequest):
 
         # Use enhanced response
         final_answer = enhancement.enhanced_response
+
+        # Prepend topic acknowledgment if topic changed
+        if topic_acknowledgment:
+            final_answer = f"{topic_acknowledgment}\n\n{final_answer}"
+            logger.info(f"📝 Prepended topic acknowledgment: {topic_acknowledgment}")
 
         # Update context
         conversational_excellence_instance.update_context_from_interaction(
