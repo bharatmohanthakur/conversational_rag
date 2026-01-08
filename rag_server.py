@@ -1369,16 +1369,36 @@ async def decomposer_node(state: AgentState):
 async def executor_node(state: AgentState):
     sub_queries = state["sub_queries"]
     user_id = state["user_id"]
+
+    # Run all sub-query searches in parallel for maximum performance
+    logger.info(f"Executing {len(sub_queries)} sub-queries in parallel")
+
+    # Create tasks for parallel execution
+    search_tasks = [
+        run_search_for_deep_agent(q, user_id)
+        for q in sub_queries
+    ]
+
+    # Execute all searches concurrently
+    search_results = await asyncio.gather(*search_tasks, return_exceptions=True)
+
+    # Process results
     answers = []
     all_sources = []
-    
-    # Run searches in sequence (to not overload API)
-    for q in sub_queries:
-        search_result = await run_search_for_deep_agent(q, user_id)
-        context_str = search_result["context"]
-        all_sources.extend(search_result["sources"])
-        answers.append(f"### Q: {q}\n{context_str}")
-        
+
+    for i, (sub_query, result) in enumerate(zip(sub_queries, search_results)):
+        # Handle exceptions gracefully
+        if isinstance(result, Exception):
+            logger.error(f"Error in sub-query {i+1} '{sub_query}': {result}")
+            answers.append(f"### Q: {sub_query}\n[Error retrieving information for this query]")
+            continue
+
+        context_str = result["context"]
+        all_sources.extend(result["sources"])
+        answers.append(f"### Q: {sub_query}\n{context_str}")
+
+    logger.info(f"Completed {len(answers)}/{len(sub_queries)} sub-queries successfully")
+
     return {"sub_answers": answers, "sources": all_sources}
 
 # 5. Synthesizer (Complex Path)
