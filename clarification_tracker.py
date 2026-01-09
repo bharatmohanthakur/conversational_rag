@@ -279,6 +279,7 @@ class ClarificationTracker:
     def is_clarification_response(self, user_id: str, query: str) -> bool:
         """
         Detect if a user query is likely answering a clarifying question.
+        Uses LLM classifier with conversation history and clarification context for natural detection.
         
         Args:
             user_id: User identifier
@@ -294,30 +295,61 @@ class ClarificationTracker:
         if session.status != ClarificationStatus.AWAITING.value:
             return False
         
-        # Check if query is actually answering clarification questions
-        # If query looks like a new question (contains question words, is too long, etc.), it's NOT a clarification answer
+        # Use LLM classifier for intelligent detection with context
+        from llm_classifier import get_llm_classifier
+        llm_classifier = get_llm_classifier()
+        
+        if llm_classifier:
+            try:
+                # Get conversation history for context
+                conversation_history = []
+                if hasattr(self, 'conv_manager'):
+                    history = self.conv_manager.get_history(user_id, limit=10)
+                    conversation_history = [
+                        {"role": msg.get("role"), "content": msg.get("content")}
+                        for msg in history
+                    ]
+                
+                # Get clarification context
+                clarification_question = session.questions[0] if session.questions else None
+                original_query = session.original_query if hasattr(session, 'original_query') else None
+                
+                # Use LLM classifier with full context
+                result = llm_classifier.classify_query(
+                    query=query,
+                    conversation_context=conversation_history,
+                    active_clarification=True,
+                    clarification_question=clarification_question,
+                    original_query=original_query
+                )
+                
+                is_clarification = result.is_clarification_answer
+                logger.info(f"🧠 LLM Clarification Detection: {is_clarification} "
+                           f"(type={result.query_type}, reasoning: {result.reasoning[:100]})")
+                
+                return is_clarification
+                
+            except Exception as e:
+                logger.warning(f"LLM classifier failed for clarification detection, using fallback: {e}")
+        
+        # Fallback to pattern matching if LLM classifier not available or fails
         query_lower = query.lower().strip()
         
         # New question indicators (NOT a clarification answer):
-        # - Contains question words at start: "what", "how", "when", "where", "who", "why", "can", "is", "are", "do", "does"
-        # - Is a greeting: "hi", "hello", "hey", "thanks", "thank you"
-        # - Is too long (likely a new question, not a short answer)
         question_starters = ["what", "how", "when", "where", "who", "why", "can", "is", "are", "do", "does", "will", "would", "should"]
         greeting_words = ["hi", "hello", "hey", "thanks", "thank you", "okay", "ok", "sure"]
         
         # Check if starts with question word or greeting
-        first_words = query_lower.split()[:2]  # First 2 words
+        first_words = query_lower.split()[:2]
         if any(word in first_words for word in question_starters):
-            # This looks like a new question, not a clarification answer
             logger.info(f"Query '{query[:50]}' looks like a new question (starts with question word), not a clarification answer")
             return False
         
         if any(word in first_words for word in greeting_words):
-            # This is a greeting, not a clarification answer
             logger.info(f"Query '{query[:50]}' is a greeting, not a clarification answer")
             return False
         
-        # If query is very long (>50 words), it's likely a new question, not a short clarification answer
+        # If query is very long (>50 words), it's likely a new question
         if len(query.split()) > 50:
             logger.info(f"Query '{query[:50]}' is too long ({len(query.split())} words), likely a new question")
             return False

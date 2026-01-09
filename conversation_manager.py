@@ -216,34 +216,116 @@ class ConversationManager:
     def get_conversation_with_summary(self, user_id: str, max_turns: int = 10) -> Dict[str, Any]:
         """
         Get conversation history with optional summarization.
-        
+
         Args:
             user_id: User identifier
             max_turns: Maximum turns to return
-        
+
         Returns:
             Dictionary with 'full_history', 'summary', and 'recent_messages'
         """
         full_history = self.get_history(user_id)
-        
+
         if len(full_history) <= max_turns:
             return {
                 "full_history": full_history,
                 "summary": None,
                 "recent_messages": full_history
             }
-        
+
         # Split into old and recent
         split_point = len(full_history) - max_turns
         old_messages = full_history[:split_point]
         recent_messages = full_history[split_point:]
-        
+
         return {
             "full_history": full_history,
             "summary": None,  # Will be set by ConversationSummarizer
             "recent_messages": recent_messages,
             "old_messages": old_messages
         }
+
+    def get_original_question(self, user_id: str, within_last_n: int = 10) -> Optional[str]:
+        """
+        Get the original user question from recent conversation history.
+        Looks for the first substantive user question (not greetings or clarification answers).
+
+        Args:
+            user_id: User identifier
+            within_last_n: Look within the last N messages
+
+        Returns:
+            Original question text or None
+        """
+        history = self.get_history(user_id, limit=within_last_n)
+
+        if not history:
+            return None
+
+        # Define greeting patterns to skip
+        greeting_patterns = ["hi", "hello", "hey", "thanks", "thank you", "okay", "ok", "sure", "great", "awesome", "perfect"]
+
+        # Look for the first substantive user question (working backwards from recent)
+        for msg in reversed(history):
+            if msg.get("role") == "user":
+                content = msg.get("content", "").strip().lower()
+
+                # Skip obvious greetings
+                is_greeting = any(pattern in content for pattern in greeting_patterns) and len(content.split()) <= 5
+
+                # Skip very short answers (likely clarification responses)
+                is_short_answer = len(content.split()) <= 3 and not content.endswith("?")
+
+                if not is_greeting and not is_short_answer:
+                    # Check if metadata marks this as the original question
+                    metadata = msg.get("metadata", {})
+                    if metadata.get("is_original_question", False):
+                        return msg.get("content", "")
+
+        # Fallback: return the first non-greeting user message
+        for msg in history:
+            if msg.get("role") == "user":
+                content = msg.get("content", "").strip().lower()
+                is_greeting = any(pattern in content for pattern in greeting_patterns) and len(content.split()) <= 5
+                if not is_greeting:
+                    return msg.get("content", "")
+
+        return None
+
+    def mark_as_original_question(self, user_id: str):
+        """
+        Mark the most recent user message as the original question.
+        This helps track the initial query across multiple clarification turns.
+
+        Args:
+            user_id: User identifier
+        """
+        try:
+            history = self.get_history(user_id)
+            if not history:
+                return
+
+            # Find the most recent user message and mark it
+            for i in range(len(history) - 1, -1, -1):
+                if history[i].get("role") == "user":
+                    history[i]["metadata"] = history[i].get("metadata", {})
+                    history[i]["metadata"]["is_original_question"] = True
+
+                    # Save updated history
+                    if self.redis_client:
+                        key = self._get_key(user_id)
+                        self.redis_client.setex(
+                            key,
+                            timedelta(days=CONVERSATION_TTL_DAYS),
+                            json.dumps(history, ensure_ascii=False)
+                        )
+                    else:
+                        self.memory_fallback[user_id] = history
+
+                    logger.info(f"Marked message as original question for user {user_id}")
+                    break
+        except Exception as e:
+            logger.error(f"Error marking original question for {user_id}: {e}")
 
 
 # Global instance
