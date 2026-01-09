@@ -3323,11 +3323,19 @@ async def query_stream_endpoint(request: QueryRequest):
                 return
 
             # === If not general query, proceed with RAG flow ===
-            # Status 3: Starting knowledge base search
+            # Status 3: Starting knowledge base search with progress indicators
             yield f"data: {json.dumps({'type': 'status', 'message': '🔍 Searching knowledge base...'}, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0)  # Force immediate flush
 
+            # Progress indicator: 10% - Starting search
+            yield f"data: {json.dumps({'type': 'progress', 'percentage': 10, 'message': 'Initializing search...'}, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(0)
+
             log_request(request_id, "🤖 DEEP_AGENT_START", {"query": query_text})
+
+            # Progress indicator: 30% - Executing query (simulate during LangGraph)
+            yield f"data: {json.dumps({'type': 'progress', 'percentage': 30, 'message': 'Querying vector database...'}, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(0)
 
             # Check for clarification
             active_session = clarification_tracker.get_active_session(user_id)
@@ -3378,9 +3386,30 @@ async def query_stream_endpoint(request: QueryRequest):
             # Invoke LangGraph - this is where the heavy lifting happens
             # The "🔍 Searching knowledge base..." status stays active during this
             result = await deep_agent_app.ainvoke(initial_state)
+
+            # Progress indicator: 70% - Retrieved results
+            yield f"data: {json.dumps({'type': 'progress', 'percentage': 70, 'message': 'Processing results...'}, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(0)
+
             answer_text = result.get("final_answer", "No answer generated.")
             complexity = result.get("complexity", "UNKNOWN")
             sources = result.get("sources", [])
+
+            # Progress indicator: 85% - Analyzing sources
+            yield f"data: {json.dumps({'type': 'progress', 'percentage': 85, 'message': 'Analyzing sources...'}, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(0)
+
+            # ============================================================================
+            # REAL-TIME SOURCE STREAMING (like Gemini's Search Grounding)
+            # ============================================================================
+            # Stream sources as they're found to give immediate feedback
+            if sources:
+                for idx, source in enumerate(sources[:5], 1):  # Stream top 5 sources
+                    source_name = source.get("source", "Unknown").replace(".md", "").replace("HRD - ", "").strip()
+                    score = source.get("score", 0.0)
+                    yield f"data: {json.dumps({'type': 'source_found', 'index': idx, 'source': source_name, 'score': round(score, 3)}, ensure_ascii=False)}\n\n"
+                    await asyncio.sleep(0)  # Force immediate flush
+                    await asyncio.sleep(0.05)  # Brief delay between sources
 
             # Log completion
             log_request(request_id, "🤖 DEEP_AGENT_END", {
@@ -3465,6 +3494,55 @@ async def query_stream_endpoint(request: QueryRequest):
 
             logger.info(f"Response enhanced: {len(enhancement.improvements_made)} improvements made")
 
+            # ============================================================================
+            # INLINE CITATIONS (like Claude/Gemini style)
+            # ============================================================================
+            # Add [1][2] citation markers within the text where source content is referenced
+            def add_inline_citations(text: str, sources_list: list) -> tuple[str, dict]:
+                """Add inline citations [1][2] to text based on source content matching"""
+                if not sources_list or len(sources_list) == 0:
+                    return text, {}
+
+                cited_text = text
+                citation_map = {}
+
+                # Create citation map for top 5 sources
+                for idx, source in enumerate(sources_list[:5], 1):
+                    source_name = source.get("source", "Unknown").replace(".md", "").replace("HRD - ", "").strip()
+                    citation_map[idx] = source_name
+
+                    # Try to find sentences that match source content
+                    source_content = source.get("text", "") or source.get("content", "")
+                    if source_content:
+                        # Extract key phrases from source (first 50 words)
+                        source_words = source_content.split()[:50]
+                        key_phrases = []
+                        for i in range(0, len(source_words)-3, 3):
+                            phrase = " ".join(source_words[i:i+3])
+                            if phrase.lower() in text.lower():
+                                key_phrases.append(phrase)
+
+                        # Add citation after sentences containing key phrases
+                        if key_phrases:
+                            for phrase in key_phrases[:2]:  # Max 2 citations per source
+                                # Find sentence containing this phrase
+                                sentences = cited_text.split('. ')
+                                for i, sent in enumerate(sentences):
+                                    if phrase.lower() in sent.lower() and f'[{idx}]' not in sent:
+                                        # Add citation at end of sentence
+                                        sentences[i] = sent + f'[{idx}]'
+                                        cited_text = '. '.join(sentences)
+                                        break
+
+                return cited_text, citation_map
+
+            # Apply inline citations to the answer
+            if sources and len(sources) > 0:
+                final_answer, citation_map = add_inline_citations(final_answer, sources)
+                logger.info(f"📎 Added {len(citation_map)} inline citations")
+            else:
+                citation_map = {}
+
             # Format answer with confidence display and source references
             if llm_classifier_instance and confidence_result:
                 final_answer_with_confidence = llm_classifier_instance.format_answer_with_confidence(
@@ -3531,34 +3609,101 @@ async def query_stream_endpoint(request: QueryRequest):
 
             total_elapsed = (datetime.now() - start_time).total_seconds()
 
+            # Progress indicator: 95% - Ready to stream
+            yield f"data: {json.dumps({'type': 'progress', 'percentage': 95, 'message': 'Preparing response...'}, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(0)
+
             # Status 4: Ready to stream response
             yield f"data: {json.dumps({'type': 'status', 'message': '✨ Crafting response...'}, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0)  # Force immediate flush
-            await asyncio.sleep(0.3)  # Brief pause before streaming starts
+
+            # Progress indicator: 100% - Complete, streaming begins
+            yield f"data: {json.dumps({'type': 'progress', 'percentage': 100, 'message': 'Streaming response...'}, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(0)
+            await asyncio.sleep(0.2)  # Brief pause before streaming starts
 
             # ============================================================================
             # BEST-IN-CLASS STREAMING (like Gemini, ChatGPT, Claude)
             # ============================================================================
-            # Stream word-by-word for smooth, natural delivery
-            words = final_answer_with_confidence.split()
-            for i, word in enumerate(words):
-                # Add space before word (except first word)
-                text_chunk = word if i == 0 else f" {word}"
+            # Enhanced streaming with code block detection and formatting hints
+            import re
 
-                yield f"data: {json.dumps({'type': 'token', 'text': text_chunk}, ensure_ascii=False)}\n\n"
+            # Detect code blocks in the response
+            code_block_pattern = r'```(\w+)?\n(.*?)```'
+            code_blocks = list(re.finditer(code_block_pattern, final_answer_with_confidence, re.DOTALL))
 
-                # Dynamic delay for natural reading pace
-                # Shorter delay for small words, longer for sentences/punctuation
-                if word.endswith(('.', '!', '?')):
-                    await asyncio.sleep(0.08)  # Pause at sentence end
-                elif word.endswith((',', ';', ':')):
-                    await asyncio.sleep(0.05)  # Pause at clause end
-                elif len(word) > 12:
-                    await asyncio.sleep(0.03)  # Longer words need more time
-                else:
-                    await asyncio.sleep(0.02)  # Normal pace
+            token_count = 0  # Track tokens for usage display
 
-            # Send comprehensive final metadata
+            # If no code blocks, use simple word-by-word streaming
+            if not code_blocks:
+                words = final_answer_with_confidence.split()
+                for i, word in enumerate(words):
+                    text_chunk = word if i == 0 else f" {word}"
+                    yield f"data: {json.dumps({'type': 'token', 'text': text_chunk}, ensure_ascii=False)}\n\n"
+                    token_count += 1
+
+                    # Dynamic delay for natural reading pace
+                    if word.endswith(('.', '!', '?')):
+                        await asyncio.sleep(0.08)  # Pause at sentence end
+                    elif word.endswith((',', ';', ':')):
+                        await asyncio.sleep(0.05)  # Pause at clause end
+                    elif len(word) > 12:
+                        await asyncio.sleep(0.03)  # Longer words need more time
+                    else:
+                        await asyncio.sleep(0.02)  # Normal pace
+            else:
+                # Stream with code block detection
+                last_end = 0
+                for match in code_blocks:
+                    # Stream text before code block
+                    text_before = final_answer_with_confidence[last_end:match.start()]
+                    if text_before:
+                        words = text_before.split()
+                        for i, word in enumerate(words):
+                            text_chunk = word if i == 0 and last_end == 0 else f" {word}"
+                            yield f"data: {json.dumps({'type': 'token', 'text': text_chunk}, ensure_ascii=False)}\n\n"
+                            token_count += 1
+                            if word.endswith(('.', '!', '?')):
+                                await asyncio.sleep(0.08)
+                            elif word.endswith((',', ';', ':')):
+                                await asyncio.sleep(0.05)
+                            else:
+                                await asyncio.sleep(0.02)
+
+                    # Send code block metadata
+                    language = match.group(1) or "plaintext"
+                    code_content = match.group(2)
+
+                    # Signal code block start with language
+                    yield f"data: {json.dumps({'type': 'code_block_start', 'language': language}, ensure_ascii=False)}\n\n"
+                    await asyncio.sleep(0)
+
+                    # Stream code content (faster, no delays)
+                    yield f"data: {json.dumps({'type': 'code', 'text': code_content}, ensure_ascii=False)}\n\n"
+                    token_count += len(code_content.split())
+                    await asyncio.sleep(0.1)  # Brief pause after code
+
+                    # Signal code block end
+                    yield f"data: {json.dumps({'type': 'code_block_end'}, ensure_ascii=False)}\n\n"
+                    await asyncio.sleep(0)
+
+                    last_end = match.end()
+
+                # Stream remaining text after last code block
+                text_after = final_answer_with_confidence[last_end:]
+                if text_after:
+                    words = text_after.split()
+                    for word in words:
+                        yield f"data: {json.dumps({'type': 'token', 'text': f' {word}'}, ensure_ascii=False)}\n\n"
+                        token_count += 1
+                        if word.endswith(('.', '!', '?')):
+                            await asyncio.sleep(0.08)
+                        elif word.endswith((',', ';', ':')):
+                            await asyncio.sleep(0.05)
+                        else:
+                            await asyncio.sleep(0.02)
+
+            # Send comprehensive final metadata with token usage and citations
             final_metadata = {
                 "type": "done",
                 "metadata": {
@@ -3576,7 +3721,13 @@ async def query_stream_endpoint(request: QueryRequest):
                         "should_show_warning": confidence_result.should_show_warning if confidence_result else False,
                         "warning_message": confidence_result.warning_message if confidence_result else None
                     },
-                    "enhancements": enhancement.improvements_made
+                    "enhancements": enhancement.improvements_made,
+                    "token_usage": {
+                        "tokens_streamed": token_count,
+                        "estimated_input_tokens": len(query_text.split()) + sum(len(s.get("text", "").split()) for s in sources[:5]),
+                        "estimated_total_tokens": token_count + len(query_text.split())
+                    },
+                    "citations": citation_map if citation_map else {}
                 }
             }
             yield f"data: {json.dumps(final_metadata, ensure_ascii=False)}\n\n"
@@ -3584,7 +3735,7 @@ async def query_stream_endpoint(request: QueryRequest):
             log_request(request_id, "🤖 STREAM_END", {
                 "elapsed_sec": round(total_elapsed, 3),
                 "complexity": complexity,
-                "words_streamed": len(words)
+                "tokens_streamed": token_count
             })
 
         except Exception as e:
