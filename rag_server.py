@@ -3151,18 +3151,141 @@ async def parlant_query_endpoint(request: ParlantQueryRequest):
 async def query_stream_endpoint(request: QueryRequest):
     """
     Streaming version of /query endpoint for progressive response delivery.
-    Maintains same request format, streams response tokens.
+    FULLY ALIGNED with /query endpoint - includes all optimization features:
+    - User profile tracking
+    - Topic change detection
+    - Conversation state machine
+    - General query handler
+    - Conversational excellence
+    - LLM context classifier
+    - LLM confidence classifier
     """
     async def generate() -> AsyncGenerator[str, None]:
         request_id = str(uuid.uuid4())[:8]
+        start_time = datetime.now()
+
         try:
             query_text = request.query.strip()
             user_id = request.user_id or "default_user"
-            
-            # Get history and rewrite query
+
+            # Send initial status
+            yield f"data: {json.dumps({'type': 'status', 'message': 'Processing query...'}, ensure_ascii=False)}\n\n"
+
+            log_request(request_id, "🤖 QUERY_START", {"query": query_text})
+
+            # Get enhanced components including general query handler and optimization modules
+            components = get_enhanced_components()
+            general_query_handler_instance = components[9]
+            conversational_excellence_instance = components[10]
+            best_guess_answering_instance = components[11]
+            user_profile_tracker_instance = components[12]
+            topic_change_detector_instance = components[13]
+            conversation_state_machine_instance = components[14]
+            unified_clarification_handler_instance = components[15]
+            llm_context_classifier_instance = components[16] if len(components) > 16 else None
+            llm_classifier_instance = components[17] if len(components) > 17 else None
+
+            # Get conversation history
             history = get_user_history(user_id)
-            rewritten_query = rewrite_query_with_history(history, query_text)
-            
+
+            # ============================================================================
+            # OPTIMIZATION LAYER: User Profile, Topic Detection, State Management
+            # ============================================================================
+
+            # 1. Extract and remember user context
+            user_profile_tracker_instance.update_from_query(
+                user_id=user_id,
+                query=query_text,
+                conversation_history=history
+            )
+            user_profile = user_profile_tracker_instance.get_profile(user_id)
+            logger.info(f"👤 User profile for {user_id}: {user_profile}")
+
+            # 2. Detect topic changes
+            topic_acknowledgment = None
+            active_clarification = clarification_tracker.get_active_session(user_id)
+            skip_topic_transition = False
+
+            if active_clarification and llm_context_classifier_instance:
+                last_question = getattr(active_clarification, 'questions', [''])[0] if active_clarification else ""
+                original_query = getattr(active_clarification, 'original_query', "") if active_clarification else ""
+
+                context_classification = llm_context_classifier_instance.classify_user_response(
+                    user_response=query_text,
+                    conversation_history=history,
+                    last_clarification_question=last_question,
+                    original_query=original_query
+                )
+                logger.info(f"🧠 LLM Context: {context_classification.classification} "
+                           f"(confidence: {context_classification.confidence:.2f})")
+
+                if context_classification.classification == "clarification_answer":
+                    skip_topic_transition = True
+                elif context_classification.classification == "topic_change":
+                    clarification_tracker.abandon_session(user_id)
+                    topic_acknowledgment = "No problem, let me help you with that instead."
+
+            if not skip_topic_transition and len(history) > 0:
+                last_user_messages = [m for m in history if m.get("role") == "user"]
+                if last_user_messages:
+                    last_query = last_user_messages[-1].get("content", "")
+                    topic_transition = topic_change_detector_instance.detect_transition(
+                        previous_query=last_query,
+                        current_query=query_text,
+                        conversation_history=history
+                    )
+                    if topic_transition.changed and topic_transition.acknowledgment:
+                        topic_acknowledgment = topic_transition.acknowledgment
+
+            # 3. Update conversation state machine
+            conversation_state_machine_instance.transition_to_answering(user_id)
+
+            # === Check if this is a general conversational query ===
+            general_response = general_query_handler_instance.handle_query(
+                query=query_text,
+                conversation_history=history,
+                confidence_threshold=0.7
+            )
+
+            if general_response is not None:
+                # Stream general conversational response
+                total_elapsed = (datetime.now() - start_time).total_seconds()
+
+                # Save to history
+                conv_manager.add_message(user_id, "user", query_text, {
+                    "request_id": request_id,
+                    "query_type": "general_conversational"
+                })
+                conv_manager.add_message(user_id, "assistant", general_response, {
+                    "request_id": request_id,
+                    "query_type": "general_conversational"
+                })
+
+                # Stream the response
+                chunk_size = 50
+                for i in range(0, len(general_response), chunk_size):
+                    chunk = general_response[i:i + chunk_size]
+                    yield f"data: {json.dumps({'type': 'token', 'text': chunk}, ensure_ascii=False)}\n\n"
+                    await asyncio.sleep(0.01)
+
+                # Send metadata
+                yield f"data: {json.dumps({{'type': 'done', 'metadata': {{'request_id': request_id, 'query_type': 'general_conversational', 'elapsed_sec': round(total_elapsed, 3)}}}}, ensure_ascii=False)}\n\n"
+                return
+
+            # === If not general query, proceed with RAG flow ===
+            log_request(request_id, "🤖 DEEP_AGENT_START", {"query": query_text})
+
+            # Check for clarification
+            active_session = clarification_tracker.get_active_session(user_id)
+            is_clarification = active_session and clarification_tracker.is_clarification_response(user_id, query_text)
+
+            if is_clarification:
+                rewritten_query = query_text
+            else:
+                if active_session:
+                    clarification_tracker.abandon_session(user_id)
+                rewritten_query = rewrite_query_with_history(history, query_text, user_id)
+
             # Extract previous response
             previous_response = ""
             original_user_query = ""
@@ -3175,8 +3298,8 @@ async def query_stream_endpoint(request: QueryRequest):
                     user_messages = [m for m in history if m.get("role") == "user"]
                     if len(user_messages) >= 1:
                         original_user_query = user_messages[-1].get("content", "")
-            
-            # Initial state
+
+            # Initial state with optimization data
             initial_state = {
                 "original_query": rewritten_query,
                 "user_id": user_id,
@@ -3191,48 +3314,135 @@ async def query_stream_endpoint(request: QueryRequest):
                 "awaiting_clarification": False,
                 "user_responses": [],
                 "rag_context_for_clarification": "",
-                "original_user_query": original_user_query
+                "original_user_query": original_user_query,
+                "is_greeting": False,
+                "greeting_type": None,
+                "user_profile": user_profile,
+                "topic_acknowledgment": topic_acknowledgment
             }
-            
+
             # Invoke LangGraph
             result = await deep_agent_app.ainvoke(initial_state)
             answer_text = result.get("final_answer", "No answer generated.")
-            
-            # Stream response in chunks
-            chunk_size = 50  # Characters per chunk
-            for i in range(0, len(answer_text), chunk_size):
-                chunk = answer_text[i:i + chunk_size]
-                yield f"data: {json.dumps({'type': 'token', 'text': chunk}, ensure_ascii=False)}\n\n"
-                await asyncio.sleep(0.01)  # Small delay for streaming effect
-            
-            # Send final metadata
+            complexity = result.get("complexity", "UNKNOWN")
             sources = result.get("sources", [])
-            quality_assessment = AnswerQuality.assess_answer(
-                answer_text, sources, [], query_text
+
+            # Build context for confidence assessment
+            context_parts = []
+            for source in sources[:5]:
+                source_name = source.get("source", "Unknown")
+                text_content = source.get("text", "") or source.get("content", "")
+                if text_content:
+                    context_parts.append(f"Source: {source_name}\nContent: {text_content[:300]}")
+            context_str = "\n\n".join(context_parts) if context_parts else "No context available"
+
+            # LLM confidence assessment
+            confidence_result = None
+            if llm_classifier_instance:
+                try:
+                    confidence_result = llm_classifier_instance.assess_answer_confidence(
+                        query=query_text,
+                        answer=answer_text,
+                        sources=sources,
+                        context=context_str
+                    )
+                except Exception as e:
+                    logger.error(f"Error in LLM confidence assessment: {e}")
+
+            # Fallback to AnswerQuality
+            if confidence_result is None:
+                quality_assessment = AnswerQuality.assess_answer(
+                    answer_text, sources, [], query_text
+                )
+                confidence_level_str = quality_assessment["confidence"]["level"]
+                if confidence_level_str == "high":
+                    conf_level = ConfidenceLevel.HIGH
+                elif confidence_level_str == "low":
+                    conf_level = ConfidenceLevel.LOW
+                else:
+                    conf_level = ConfidenceLevel.MEDIUM
+                confidence_result = AnswerConfidenceResult(
+                    confidence_level=conf_level,
+                    confidence_score=quality_assessment["confidence"]["score"],
+                    source_quality="good" if quality_assessment["grounding"]["is_grounded"] else "fair",
+                    has_sufficient_context=True,
+                    reasoning="Fallback assessment"
+                )
+
+            # === Enhance response for natural conversation ===
+            conv_context = conversational_excellence_instance.get_or_create_context(
+                user_id=user_id,
+                conversation_history=history
             )
-            
+
+            enhancement = conversational_excellence_instance.enhance_response(
+                original_response=answer_text,
+                user_query=query_text,
+                context=conv_context,
+                metadata={
+                    "confidence": confidence_result.confidence_score,
+                    "sources": sources,
+                    "complexity": complexity
+                }
+            )
+
+            final_answer = enhancement.enhanced_response
+
+            # Prepend topic acknowledgment
+            if topic_acknowledgment:
+                final_answer = f"{topic_acknowledgment}\n\n{final_answer}"
+
+            # Update context
+            conversational_excellence_instance.update_context_from_interaction(
+                user_query=query_text,
+                response=final_answer,
+                context=conv_context
+            )
+
+            # Save to history
+            is_obvious_greeting = is_greeting_or_casual(query_text)
+            metadata = {"request_id": request_id}
+            if not is_clarification and not is_obvious_greeting:
+                metadata["is_original_question"] = True
+
+            conv_manager.add_message(user_id, "user", query_text, metadata)
+            conv_manager.add_message(user_id, "assistant", final_answer, {
+                "request_id": request_id,
+                "complexity": complexity,
+                "conversational_enhancements": enhancement.improvements_made
+            })
+
+            total_elapsed = (datetime.now() - start_time).total_seconds()
+
+            # Stream enhanced response in chunks
+            chunk_size = 50
+            for i in range(0, len(final_answer), chunk_size):
+                chunk = final_answer[i:i + chunk_size]
+                yield f"data: {json.dumps({'type': 'token', 'text': chunk}, ensure_ascii=False)}\n\n"
+                await asyncio.sleep(0.01)
+
+            # Send final metadata
             final_metadata = {
                 "type": "done",
                 "metadata": {
                     "request_id": request_id,
-                    "complexity": result.get("complexity", "UNKNOWN"),
+                    "complexity": complexity,
                     "sources": sources,
                     "quality": {
-                        "confidence": quality_assessment["confidence"]["level"],
-                        "confidence_score": quality_assessment["confidence"]["score"]
-                    }
+                        "confidence": confidence_result.confidence_level.value,
+                        "confidence_score": confidence_result.confidence_score
+                    },
+                    "elapsed_sec": round(total_elapsed, 3),
+                    "enhancements": enhancement.improvements_made
                 }
             }
             yield f"data: {json.dumps(final_metadata, ensure_ascii=False)}\n\n"
-            
-            # Save to conversation history
-            conv_manager.add_message(user_id, "user", query_text, {"request_id": request_id})
-            conv_manager.add_message(user_id, "assistant", answer_text, {"request_id": request_id})
-            
+
         except Exception as e:
+            logger.error(f"Streaming error: {e}", exc_info=True)
             error_msg = json.dumps({"type": "error", "error": str(e)}, ensure_ascii=False)
             yield f"data: {error_msg}\n\n"
-    
+
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
