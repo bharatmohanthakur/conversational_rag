@@ -3013,8 +3013,26 @@ async def query_endpoint(request: QueryRequest):
 
         logger.info(f"Response enhanced: {len(enhancement.improvements_made)} improvements made")
 
+        # Check if response is conversational (greeting/acknowledgment) vs knowledge-based
+        # If it's conversational, skip confidence footer
+        is_conversational_response = (
+            len(sources) == 0 and  # No sources found
+            (
+                # Short response (< 100 words)
+                len(final_answer.split()) < 100 or
+                # Starts with greeting patterns
+                final_answer.lower().startswith(('hi', 'hello', 'hey', 'great', 'thank'))
+            )
+        )
+
         # Format answer with confidence display and source references using LLM classifier
-        if llm_classifier_instance and confidence_result:
+        # BUT: Skip confidence footer for conversational responses
+        if is_conversational_response:
+            # This is a conversational response (greeting/acknowledgment)
+            # Don't add confidence footer - it doesn't make sense
+            final_answer_with_confidence = final_answer
+            logger.info("Skipping confidence footer for conversational response")
+        elif llm_classifier_instance and confidence_result:
             final_answer_with_confidence = llm_classifier_instance.format_answer_with_confidence(
                 answer=final_answer,
                 confidence=confidence_result,
