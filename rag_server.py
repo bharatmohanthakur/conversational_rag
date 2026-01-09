@@ -3248,7 +3248,7 @@ async def query_stream_endpoint(request: QueryRequest):
             )
 
             if general_response is not None:
-                # Stream general conversational response
+                # Stream general conversational response word-by-word
                 total_elapsed = (datetime.now() - start_time).total_seconds()
 
                 # Save to history
@@ -3261,15 +3261,38 @@ async def query_stream_endpoint(request: QueryRequest):
                     "query_type": "general_conversational"
                 })
 
-                # Stream the response
-                chunk_size = 50
-                for i in range(0, len(general_response), chunk_size):
-                    chunk = general_response[i:i + chunk_size]
-                    yield f"data: {json.dumps({'type': 'token', 'text': chunk}, ensure_ascii=False)}\n\n"
-                    await asyncio.sleep(0.01)
+                # Stream word-by-word for natural delivery (like Gemini/ChatGPT/Claude)
+                words = general_response.split()
+                for i, word in enumerate(words):
+                    text_chunk = word if i == 0 else f" {word}"
+                    yield f"data: {json.dumps({'type': 'token', 'text': text_chunk}, ensure_ascii=False)}\n\n"
+
+                    # Dynamic delay for natural reading pace
+                    if word.endswith(('.', '!', '?')):
+                        await asyncio.sleep(0.08)  # Pause at sentence end
+                    elif word.endswith((',', ';', ':')):
+                        await asyncio.sleep(0.05)  # Pause at clause end
+                    elif len(word) > 12:
+                        await asyncio.sleep(0.03)  # Longer words
+                    else:
+                        await asyncio.sleep(0.02)  # Normal pace
 
                 # Send metadata
-                yield f"data: {json.dumps({{'type': 'done', 'metadata': {{'request_id': request_id, 'query_type': 'general_conversational', 'elapsed_sec': round(total_elapsed, 3)}}}}, ensure_ascii=False)}\n\n"
+                final_metadata = {
+                    "type": "done",
+                    "metadata": {
+                        "request_id": request_id,
+                        "query_type": "general_conversational",
+                        "elapsed_sec": round(total_elapsed, 3),
+                        "words_streamed": len(words)
+                    }
+                }
+                yield f"data: {json.dumps(final_metadata, ensure_ascii=False)}\n\n"
+
+                log_request(request_id, "✅ GENERAL_QUERY_STREAM_COMPLETE", {
+                    "elapsed_sec": round(total_elapsed, 3),
+                    "words_streamed": len(words)
+                })
                 return
 
             # === If not general query, proceed with RAG flow ===
@@ -3326,6 +3349,14 @@ async def query_stream_endpoint(request: QueryRequest):
             answer_text = result.get("final_answer", "No answer generated.")
             complexity = result.get("complexity", "UNKNOWN")
             sources = result.get("sources", [])
+
+            # Log completion
+            log_request(request_id, "🤖 DEEP_AGENT_END", {
+                "elapsed_sec": round((datetime.now() - start_time).total_seconds(), 3),
+                "complexity": complexity,
+                "sub_queries": len(result.get("sub_queries", [])),
+                "response_length": len(answer_text)
+            })
 
             # Build context for confidence assessment
             context_parts = []
@@ -3391,6 +3422,7 @@ async def query_stream_endpoint(request: QueryRequest):
             # Prepend topic acknowledgment
             if topic_acknowledgment:
                 final_answer = f"{topic_acknowledgment}\n\n{final_answer}"
+                logger.info(f"📝 Prepended topic acknowledgment: {topic_acknowledgment}")
 
             # Update context
             conversational_excellence_instance.update_context_from_interaction(
@@ -3399,47 +3431,129 @@ async def query_stream_endpoint(request: QueryRequest):
                 context=conv_context
             )
 
+            logger.info(f"Response enhanced: {len(enhancement.improvements_made)} improvements made")
+
+            # Format answer with confidence display and source references
+            if llm_classifier_instance and confidence_result:
+                final_answer_with_confidence = llm_classifier_instance.format_answer_with_confidence(
+                    answer=final_answer,
+                    confidence=confidence_result,
+                    sources=sources
+                )
+            else:
+                # Fallback: manual formatting if LLM classifier not available
+                confidence_level = confidence_result.confidence_level.value if confidence_result else "medium"
+                confidence_score = confidence_result.confidence_score if confidence_result else 0.5
+
+                # Get unique source names (top 5 unique sources, sorted by score)
+                source_names = []
+                if sources:
+                    sorted_sources = sorted(sources, key=lambda x: x.get("score", 0), reverse=True)
+                    seen = set()
+                    for s in sorted_sources[:10]:
+                        source_name = s.get("source", "Unknown").replace(".md", "").replace("HRD - ", "").strip()
+                        if source_name and source_name not in seen:
+                            source_names.append(source_name)
+                            seen.add(source_name)
+                            if len(source_names) >= 5:
+                                break
+                if not source_names:
+                    source_names = ["Knowledge Base"]
+                source_display = ", ".join(source_names) if source_names else "General Knowledge Base"
+
+                confidence_footer = "\n\n---\n"
+                if confidence_level == "high":
+                    confidence_footer += f"📊 **Confidence:** HIGH ({confidence_score:.0%})\n"
+                elif confidence_level == "medium":
+                    confidence_footer += f"📊 **Confidence:** MEDIUM ({confidence_score:.0%})\n"
+                else:
+                    confidence_footer += f"⚠️ **Confidence:** LOW ({confidence_score:.0%}) - Information may be incomplete\n"
+
+                confidence_footer += f"📚 **Sources:** {source_display}\n"
+                if confidence_level == "low":
+                    confidence_footer += "💡 **Tip:** Consider contacting HR for verification\n"
+
+                final_answer_with_confidence = final_answer + confidence_footer
+
             # Save to history
             is_obvious_greeting = is_greeting_or_casual(query_text)
-            metadata = {"request_id": request_id}
+            user_metadata = {"request_id": request_id}
             if not is_clarification and not is_obvious_greeting:
-                metadata["is_original_question"] = True
+                user_metadata["is_original_question"] = True
 
-            conv_manager.add_message(user_id, "user", query_text, metadata)
-            conv_manager.add_message(user_id, "assistant", final_answer, {
+            conv_manager.add_message(user_id, "user", query_text, user_metadata)
+            conv_manager.add_message(user_id, "assistant", final_answer_with_confidence, {
                 "request_id": request_id,
                 "complexity": complexity,
+                "confidence": {
+                    "level": confidence_result.confidence_level.value if confidence_result else "medium",
+                    "score": confidence_result.confidence_score if confidence_result else 0.5,
+                    "source_quality": confidence_result.source_quality if confidence_result else "fair",
+                    "reasoning": confidence_result.reasoning if confidence_result else ""
+                },
                 "conversational_enhancements": enhancement.improvements_made
             })
 
+            # Async save to graphiti
+            asyncio.create_task(save_to_graphiti_memory(user_id, query_text, answer_text))
+
             total_elapsed = (datetime.now() - start_time).total_seconds()
 
-            # Stream enhanced response in chunks
-            chunk_size = 50
-            for i in range(0, len(final_answer), chunk_size):
-                chunk = final_answer[i:i + chunk_size]
-                yield f"data: {json.dumps({'type': 'token', 'text': chunk}, ensure_ascii=False)}\n\n"
-                await asyncio.sleep(0.01)
+            # ============================================================================
+            # BEST-IN-CLASS STREAMING (like Gemini, ChatGPT, Claude)
+            # ============================================================================
+            # Stream word-by-word for smooth, natural delivery
+            words = final_answer_with_confidence.split()
+            for i, word in enumerate(words):
+                # Add space before word (except first word)
+                text_chunk = word if i == 0 else f" {word}"
 
-            # Send final metadata
+                yield f"data: {json.dumps({'type': 'token', 'text': text_chunk}, ensure_ascii=False)}\n\n"
+
+                # Dynamic delay for natural reading pace
+                # Shorter delay for small words, longer for sentences/punctuation
+                if word.endswith(('.', '!', '?')):
+                    await asyncio.sleep(0.08)  # Pause at sentence end
+                elif word.endswith((',', ';', ':')):
+                    await asyncio.sleep(0.05)  # Pause at clause end
+                elif len(word) > 12:
+                    await asyncio.sleep(0.03)  # Longer words need more time
+                else:
+                    await asyncio.sleep(0.02)  # Normal pace
+
+            # Send comprehensive final metadata
             final_metadata = {
                 "type": "done",
                 "metadata": {
                     "request_id": request_id,
+                    "agent": "LangGraph Decomposition",
                     "complexity": complexity,
+                    "sub_queries": result.get("sub_queries", []),
                     "sources": sources,
-                    "quality": {
-                        "confidence": confidence_result.confidence_level.value,
-                        "confidence_score": confidence_result.confidence_score
-                    },
                     "elapsed_sec": round(total_elapsed, 3),
+                    "quality": {
+                        "confidence": confidence_result.confidence_level.value if confidence_result else "medium",
+                        "confidence_score": confidence_result.confidence_score if confidence_result else 0.5,
+                        "source_quality": confidence_result.source_quality if confidence_result else "fair",
+                        "has_sufficient_context": confidence_result.has_sufficient_context if confidence_result else True,
+                        "should_show_warning": confidence_result.should_show_warning if confidence_result else False,
+                        "warning_message": confidence_result.warning_message if confidence_result else None
+                    },
                     "enhancements": enhancement.improvements_made
                 }
             }
             yield f"data: {json.dumps(final_metadata, ensure_ascii=False)}\n\n"
 
+            log_request(request_id, "🤖 STREAM_END", {
+                "elapsed_sec": round(total_elapsed, 3),
+                "complexity": complexity,
+                "words_streamed": len(words)
+            })
+
         except Exception as e:
-            logger.error(f"Streaming error: {e}", exc_info=True)
+            log_request(request_id, "❌ STREAM_ERROR", {"error": str(e)}, level="error")
+            import traceback
+            traceback.print_exc()
             error_msg = json.dumps({"type": "error", "error": str(e)}, ensure_ascii=False)
             yield f"data: {error_msg}\n\n"
 
