@@ -142,17 +142,60 @@ class UserProfileTracker:
 
         return self.profiles[user_id]
 
-    def extract_from_text(self, text: str, user_id: str) -> Dict[str, Any]:
+    def extract_from_text(self, text: str, user_id: str, conversation_history: Optional[List[Dict]] = None) -> Dict[str, Any]:
         """
-        Extract profile information from text.
+        Extract profile information from text using LLM classifier.
+        Uses natural language understanding with conversation history for context-aware extraction.
 
         Args:
             text: Text to extract from
             user_id: User ID
+            conversation_history: Optional conversation history for context
 
         Returns:
             Dictionary of extracted information
         """
+        # Use LLM classifier for intelligent extraction with context
+        from llm_classifier import get_llm_classifier
+        llm_classifier = get_llm_classifier()
+        
+        if llm_classifier:
+            try:
+                # Get conversation history if not provided
+                if conversation_history is None and hasattr(self, 'conv_manager'):
+                    history = self.conv_manager.get_history(user_id, limit=10)
+                    conversation_history = [
+                        {"role": msg.get("role"), "content": msg.get("content")}
+                        for msg in history
+                    ]
+                
+                # Use LLM classifier for natural extraction
+                profile_info = llm_classifier.detect_user_profile_info(
+                    text=text,
+                    conversation_history=conversation_history
+                )
+                
+                extracted = {}
+                if profile_info.role:
+                    extracted['role'] = profile_info.role
+                if profile_info.country:
+                    extracted['country'] = profile_info.country
+                if profile_info.department:
+                    extracted['department'] = profile_info.department
+                if profile_info.brand:
+                    extracted['brand'] = profile_info.brand
+                if profile_info.employment_type:
+                    extracted['employment_type'] = profile_info.employment_type
+                
+                if extracted:
+                    logger.info(f"🧠 LLM Profile Extraction: {extracted} (confidence: {profile_info.confidence:.0%}, reasoning: {profile_info.reasoning[:100]})")
+                
+                return extracted
+                
+            except Exception as e:
+                logger.warning(f"LLM classifier failed for profile extraction, using fallback: {e}")
+        
+        # Fallback to pattern matching if LLM classifier not available or fails
         text_lower = text.lower()
         extracted = {}
 
@@ -202,7 +245,15 @@ class UserProfileTracker:
 
         # Only extract from user messages
         if role == "user":
-            extracted = self.extract_from_text(message, user_id)
+            # Get conversation history for context
+            conversation_history = None
+            if hasattr(self, 'conv_manager'):
+                history = self.conv_manager.get_history(user_id, limit=10)
+                conversation_history = [
+                    {"role": msg.get("role"), "content": msg.get("content")}
+                    for msg in history
+                ]
+            extracted = self.extract_from_text(message, user_id, conversation_history)
 
             # Update profile with extracted info
             updated = False
@@ -235,14 +286,14 @@ class UserProfileTracker:
         """
         profile = self.get_profile(user_id)
 
-        # Extract from current query
-        extracted = self.extract_from_text(query, user_id)
+        # Extract from current query with conversation history for context
+        extracted = self.extract_from_text(query, user_id, conversation_history)
 
-        # Also extract from recent conversation history
+        # Also extract from recent conversation history (LLM already considers this in context, but we can merge)
         if conversation_history:
             for msg in conversation_history[-10:]:  # Last 10 messages
                 if msg.get("role") == "user":
-                    hist_extracted = self.extract_from_text(msg.get("content", ""), user_id)
+                    hist_extracted = self.extract_from_text(msg.get("content", ""), user_id, conversation_history)
                     # Merge extracted info (query takes precedence)
                     for key, value in hist_extracted.items():
                         if key not in extracted:

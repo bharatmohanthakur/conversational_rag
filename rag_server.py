@@ -61,6 +61,8 @@ from user_profile_tracker import UserProfileTracker
 from topic_change_detector import TopicChangeDetector
 from conversation_state_machine import ConversationStateMachine, ConversationState
 from clarification_handler import ClarificationHandler
+from llm_context_classifier import init_llm_context_classifier, get_llm_context_classifier
+from llm_classifier import init_llm_classifier, get_llm_classifier, LLMClassifier, AnswerConfidenceResult, ConfidenceLevel
 from optimized_query_processor import init_query_processor, get_query_processor
 
 # Graphiti imports
@@ -197,6 +199,8 @@ _user_profile_tracker = None
 _topic_change_detector = None
 _conversation_state_machine = None
 _unified_clarification_handler = None
+_llm_context_classifier = None
+_llm_classifier = None
 
 def get_enhanced_components():
     """Get or initialize enhanced components."""
@@ -204,7 +208,7 @@ def get_enhanced_components():
     global _self_evaluator, _adaptive_retriever, _quality_gate
     global _contextual_compressor, _reranker, _corrective_rag, _general_query_handler, _conversational_excellence
     global _best_guess_answering, _user_profile_tracker, _topic_change_detector
-    global _conversation_state_machine, _unified_clarification_handler
+    global _conversation_state_machine, _unified_clarification_handler, _llm_context_classifier, _llm_classifier
     if _conv_manager is None:
         _conv_manager = get_conversation_manager()
         _clarification_tracker = ClarificationTracker(_conv_manager)
@@ -277,11 +281,19 @@ def get_enhanced_components():
             clarification_tracker=_clarification_tracker
         )
 
+        # Initialize LLM Context Classifier with CoT reasoning
+        init_llm_context_classifier(aoai_client, AZURE_CHAT_DEPLOYMENT)
+        _llm_context_classifier = get_llm_context_classifier()
+
+        # Initialize comprehensive LLM Classifier (zero hardcoding)
+        init_llm_classifier(aoai_client, AZURE_CHAT_DEPLOYMENT, cache_enabled=True)
+        _llm_classifier = get_llm_classifier()
+
     return (_conv_manager, _clarification_tracker, _conversation_summarizer, _self_evaluator,
             _quality_gate, _adaptive_retriever, _contextual_compressor,
             _reranker, _corrective_rag, _general_query_handler, _conversational_excellence,
             _best_guess_answering, _user_profile_tracker, _topic_change_detector,
-            _conversation_state_machine, _unified_clarification_handler)
+            _conversation_state_machine, _unified_clarification_handler, _llm_context_classifier, _llm_classifier)
 
 # ---------------------------------------------------------------------
 # Graphiti Memory System
@@ -442,10 +454,10 @@ class QueryResponse(BaseModel):
 # ---------------------------------------------------------------------
 # Get enhanced components
 (conv_manager, clarification_tracker, conversation_summarizer, self_evaluator,
- quality_gate, adaptive_retriever, contextual_compressor,
- reranker, corrective_rag, general_query_handler, conversational_excellence,
- best_guess_answering, user_profile_tracker, topic_change_detector,
- conversation_state_machine, unified_clarification_handler) = get_enhanced_components()
+        quality_gate, adaptive_retriever, contextual_compressor,
+        reranker, corrective_rag, general_query_handler, conversational_excellence,
+        best_guess_answering, user_profile_tracker, topic_change_detector,
+        conversation_state_machine, unified_clarification_handler, llm_context_classifier, llm_classifier) = get_enhanced_components()
 
 def get_user_history(user_id: str, use_summarization: bool = True) -> List[Dict[str, str]]:
     """
@@ -1143,7 +1155,7 @@ class GreetingDetectionOutput(BaseModel):
 async def greeting_detection_node(state: AgentState):
     """
     Detect if the user query is a greeting, casual message, or emotional expression.
-    Uses fast pattern matching first, then LLM for edge cases.
+    Uses fast pattern matching for obvious greetings, then LLM classifier for context-aware detection.
     """
     query = state["original_query"]
     user_id = state["user_id"]
@@ -1175,42 +1187,83 @@ async def greeting_detection_node(state: AgentState):
         logger.info(f"Greeting detection: Active clarification session, skipping greeting check")
         return {"is_greeting": False}
     
-    # Use pattern matching for other greetings (no LLM call needed)
-    is_greeting_pattern = is_greeting_or_casual(query)
+    # Use LLM classifier primarily for natural, context-aware greeting detection
+    from llm_classifier import get_llm_classifier
+    llm_classifier = get_llm_classifier()
+    
+    if llm_classifier:
+        try:
+            # Get conversation history for context
+            conversation_history = []
+            if user_id:
+                history = get_user_history(user_id, use_summarization=False)
+                conversation_history = history[-5:]  # Last 5 messages for context
+            
+            # Use LLM classifier with conversation history
+            result = llm_classifier.classify_query(
+                query=query,
+                conversation_context=conversation_history,
+                active_clarification=False
+            )
+            
+            is_greeting = result.is_greeting or result.is_casual
+            greeting_type = "greeting" if result.is_greeting else ("casual" if result.is_casual else None)
+            
+            logger.info(f"🧠 LLM Greeting Detection: is_greeting={is_greeting}, type={result.query_type} "
+                       f"(reasoning: {result.reasoning[:100]})")
+            
+            return {
+                "is_greeting": is_greeting,
+                "greeting_type": greeting_type or "greeting"
+            }
+        except Exception as e:
+            logger.warning(f"LLM classifier failed for greeting detection, using fallback: {e}")
+    
+    # Fallback: Use pattern matching if LLM classifier not available or fails
+    # Get conversation history for fallback too
+    conversation_history = []
+    if user_id:
+        try:
+            history = get_user_history(user_id, use_summarization=False)
+            conversation_history = history[-5:]
+        except:
+            pass
+    
+    is_greeting_pattern = is_greeting_or_casual(query, conversation_history)
     if is_greeting_pattern:
         logger.info(f"Greeting detection: Pattern matching detected greeting")
         return {"is_greeting": True, "greeting_type": "greeting"}
     
-    # Only use LLM for ambiguous cases (queries that might be greetings or questions)
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are a greeting detection expert. Determine if the user's message is:\n"
-                   "- A greeting (hello, hi, good morning, etc.)\n"
-                   "- A casual message (thanks, okay, sure, etc.)\n"
-                   "- An emotional expression (thank you, great, awesome, etc.)\n"
-                   "- OR an actual HR question/query that needs to be answered\n\n"
-                   "Examples of greetings/casual:\n"
-                   "- 'Hello', 'Hi', 'Good morning', 'Hey'\n"
-                   "- 'Thanks', 'Thank you', 'Okay', 'Sure'\n"
-                   "- 'Great', 'Awesome', 'Perfect'\n\n"
-                   "Examples of HR queries (NOT greetings):\n"
-                   "- 'What is the leave policy?', 'How do I apply for leave?', 'Tell me about insurance'\n"
-                   "- Even if they start with 'Hi, what is...' - this is an HR query, not just a greeting"),
-        ("user", "{query}")
-    ])
-    
+    # Final fallback: Try structured LLM if available
     try:
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", "You are a greeting detection expert. Determine if the user's message is:\n"
+                       "- A greeting (hello, hi, good morning, etc.)\n"
+                       "- A casual message (thanks, okay, sure, etc.)\n"
+                       "- An emotional expression (thank you, great, awesome, etc.)\n"
+                       "- OR an actual HR question/query that needs to be answered\n\n"
+                       "Examples of greetings/casual:\n"
+                       "- 'Hello', 'Hi', 'Good morning', 'Hey'\n"
+                       "- 'Thanks', 'Thank you', 'Okay', 'Sure'\n"
+                       "- 'Great', 'Awesome', 'Perfect'\n\n"
+                       "Examples of HR queries (NOT greetings):\n"
+                       "- 'What is the leave policy?', 'How do I apply for leave?', 'Tell me about insurance'\n"
+                       "- Even if they start with 'Hi, what is...' - this is an HR query, not just a greeting"),
+            ("user", "{query}")
+        ])
+        
         chain = prompt | agent_llm.with_structured_output(GreetingDetectionOutput)
         result = await chain.ainvoke({"query": query})
         
-        logger.info(f"Greeting detection: LLM result - is_greeting={result.is_greeting}, type={result.greeting_type}")
+        logger.info(f"Greeting detection: Structured LLM result - is_greeting={result.is_greeting}, type={result.greeting_type}")
         return {
             "is_greeting": result.is_greeting,
             "greeting_type": result.greeting_type
         }
     except Exception as e:
-        logger.error(f"Error in greeting detection: {e}")
+        logger.error(f"Error in structured greeting detection: {e}")
         # Final fallback: use pattern matching
-        is_greeting = is_greeting_or_casual(query)
+        is_greeting = is_greeting_or_casual(query, conversation_history)
         return {"is_greeting": is_greeting}
 
 # 0b. Greeting Response Node
@@ -1218,7 +1271,7 @@ async def greeting_response_node(state: AgentState):
     """
     Generate a friendly greeting response for greetings, casual messages, or emotional expressions.
     Greetings should NEVER create clarification sessions.
-    Uses fast template responses for common greetings, LLM only for complex cases.
+    Uses LLM for ALL greetings with conversation context for personalized, context-aware responses.
     """
     query = state["original_query"]
     user_id = state["user_id"]
@@ -1231,41 +1284,86 @@ async def greeting_response_node(state: AgentState):
         clarification_tracker.abandon_session(user_id)
         logger.info(f"Abandoned clarification session for {user_id} - greeting detected")
     
-    # Fast path: Use template responses for common greetings (no LLM call)
-    query_lower = query.lower().strip()
-    
-    # Template responses for common greetings (instant, no LLM)
-    if query_lower in ["hi", "hello", "hey"]:
-        greeting_response = "Hello! How can I help you with your HR questions today?"
-    elif "good morning" in query_lower:
-        greeting_response = "Good morning! How can I assist you with your HR questions today?"
-    elif "good afternoon" in query_lower:
-        greeting_response = "Good afternoon! How can I help you with your HR questions today?"
-    elif "good evening" in query_lower:
-        greeting_response = "Good evening! How can I assist you with your HR questions today?"
-    elif "thanks" in query_lower or "thank you" in query_lower:
-        greeting_response = "You're welcome! Is there anything else I can help you with?"
-    elif query_lower in ["okay", "ok", "sure"]:
-        greeting_response = "Great! How can I assist you with your HR questions?"
-    elif query_lower in ["great", "awesome", "perfect"]:
-        greeting_response = "I'm glad I could help! Is there anything else you'd like to know?"
-    else:
-        # Use LLM only for complex/ambiguous greetings
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are a friendly HR assistant chatbot. Respond warmly and professionally to greetings, "
-                       "casual messages, or emotional expressions. Keep responses brief (1-2 sentences). "
-                       "If the user says thank you or expresses appreciation, acknowledge it warmly. "
-                       "If it's a greeting, greet them back and offer to help with HR questions."),
-            ("user", "{query}")
-        ])
-        
+    # Get conversation history for personalized, context-aware responses
+    conversation_history = []
+    if user_id:
         try:
-            response = await agent_llm.ainvoke([("system", prompt.messages[0].content), ("user", query)])
-            greeting_response = response.content
-            logger.info(f"Generated greeting response via LLM: {greeting_response[:100]}")
+            history = get_user_history(user_id, use_summarization=False)
+            conversation_history = history[-10:]  # Last 10 messages for context
         except Exception as e:
-            logger.error(f"Error generating greeting response: {e}")
+            logger.warning(f"Could not retrieve conversation history for greeting: {e}")
+    
+    # Build conversation context string for LLM
+    context_str = ""
+    if conversation_history:
+        context_parts = []
+        for msg in conversation_history:
+            role = msg.get("role", "unknown")
+            content = msg.get("content", "")
+            if content and role in ["user", "assistant"]:
+                context_parts.append(f"{role.capitalize()}: {content}")
+        if context_parts:
+            context_str = "\n".join(context_parts[-5:])  # Last 5 messages for context
+    
+    # Use LLM for ALL greetings with conversation context for personalization
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", """You are a friendly, professional HR assistant chatbot. Respond warmly and naturally to greetings, casual messages, or emotional expressions.
+
+Guidelines:
+- Be warm, friendly, and professional
+- Keep responses brief (1-2 sentences)
+- Personalize based on conversation history when available
+- If the user has asked questions before, acknowledge continuity naturally
+- If the user says thank you or expresses appreciation, acknowledge it warmly
+- If it's a greeting, greet them back and offer to help with HR questions
+- Vary your responses naturally - don't repeat the same phrase every time
+- Consider the time of day for greetings (good morning/afternoon/evening)
+- If conversation history shows previous topics, you can briefly reference them naturally
+
+Examples:
+- First greeting: "Hello! I'm here to help you with HR policies, benefits, and procedures. What can I assist you with today?"
+- Returning user: "Hello again! How can I help you with your HR questions today?"
+- After helping: "You're very welcome! Let me know if you need anything else about policies or benefits."
+- Good morning: "Good morning! I'm here to help with your HR questions. What can I assist you with today?"
+- Thank you: "You're welcome! I'm glad I could help. Is there anything else you'd like to know?"
+
+Stay in character as an HR assistant, not a general chatbot."""),
+        ("user", """User's current message: {query}
+
+{context}""")
+    ])
+    
+    try:
+        # Build messages with context
+        messages = [
+            ("system", prompt.messages[0].content),
+            ("user", prompt.messages[1].content.format(
+                query=query,
+                context=f"Recent conversation history:\n{context_str}" if context_str else "This appears to be the start of the conversation."
+            ))
+        ]
+        
+        response = await agent_llm.ainvoke(messages)
+        greeting_response = response.content.strip()
+        
+        logger.info(f"🧠 LLM Generated Personalized Greeting Response: {greeting_response[:100]}... "
+                   f"(context: {len(conversation_history)} messages)")
+        
+    except Exception as e:
+        logger.error(f"Error generating personalized greeting response via LLM: {e}")
+        # Fallback to simple template if LLM fails
+        query_lower = query.lower().strip()
+        if "good morning" in query_lower:
+            greeting_response = "Good morning! How can I assist you with your HR questions today?"
+        elif "good afternoon" in query_lower:
+            greeting_response = "Good afternoon! How can I help you with your HR questions today?"
+        elif "good evening" in query_lower:
+            greeting_response = "Good evening! How can I assist you with your HR questions today?"
+        elif "thanks" in query_lower or "thank you" in query_lower:
+            greeting_response = "You're welcome! Is there anything else I can help you with?"
+        else:
             greeting_response = "Hello! How can I help you with your HR questions today?"
+        logger.info(f"Used fallback greeting response due to LLM error")
     
     return {
         "final_answer": greeting_response,
@@ -2241,8 +2339,29 @@ EMOTIONAL_PATTERNS = [
     "happy", "excited", "confused", "frustrated", "tired", "bored"
 ]
 
-def is_greeting_or_casual(query: str) -> bool:
-    """Check if the query is a greeting, casual message, or emotional expression."""
+def is_greeting_or_casual(query: str, conversation_history: Optional[List[Dict]] = None) -> bool:
+    """
+    Check if the query is a greeting, casual message, or emotional expression.
+    Uses LLM classifier with conversation history for natural, context-aware detection.
+    """
+    # Try to use LLM classifier if available
+    llm_classifier = get_llm_classifier()
+    if llm_classifier:
+        try:
+            result = llm_classifier.classify_query(
+                query=query,
+                conversation_context=conversation_history,
+                active_clarification=False
+            )
+            # Return True if it's a greeting or casual message
+            is_greeting_or_casual_result = result.is_greeting or result.is_casual
+            if is_greeting_or_casual_result:
+                logger.info(f"🧠 LLM detected greeting/casual: {result.query_type} (reasoning: {result.reasoning[:100]})")
+            return is_greeting_or_casual_result
+        except Exception as e:
+            logger.warning(f"LLM classifier failed for greeting detection, using fallback: {e}")
+    
+    # Fallback to pattern matching if LLM classifier not available or fails
     query_lower = query.lower().strip()
     
     # Check greetings
@@ -2284,13 +2403,79 @@ async def answer_relevance_node(state: AgentState):
     if not final_answer:
         return state
     
-    # Skip for very short answers (likely error messages or simple confirmations)
-    if len(final_answer) < 50:
-        return state
+    # For CLARIFICATION_ANSWER: Provide full context to LLM for intelligent evaluation
+    # The LLM should see the original question + clarification context, not just the short answer
+    complexity = state.get("complexity", "")
+    user_id = state.get("user_id", "")
+    
+    if complexity == "CLARIFICATION_ANSWER":
+        # Get the clarification session for full context
+        session = clarification_tracker.get_active_session(user_id)
+        if session:
+            # Build full context for LLM
+            original_question = session.original_query
+            clarification_context = []
+            for i, q in enumerate(session.questions_asked):
+                answer = session.user_answers.get(i, "(not answered)")
+                clarification_context.append(f"Q: {q}\nA: {answer}")
+            
+            context_summary = "\n".join(clarification_context) if clarification_context else "No clarification context"
+            
+            # Use context-aware prompt for CLARIFICATION_ANSWER
+            prompt = ChatPromptTemplate.from_messages([
+                ("system", """You are an intelligent Answer Relevance Evaluator with full conversation context.
+
+You have access to the FULL conversation context including:
+1. The ORIGINAL question the user asked
+2. The clarification questions and user's answers
+3. The current user response being evaluated
+
+EVALUATE if the provided answer properly addresses the ORIGINAL question considering ALL context.
+
+IMPORTANT RULES:
+- If the answer properly uses the clarification context to answer the original question: is_relevant=True
+- If the user seems to be changing topics (asking about something completely different): you may refine
+- Preserve answers that are genuinely relevant to the original question + clarification context
+- The user's short response (like 'UAE') is an ANSWER to a clarification question, NOT a new query"""),
+                ("user", f"""ORIGINAL QUESTION: {original_question}
+
+CLARIFICATION CONTEXT:
+{context_summary}
+
+USER'S CURRENT RESPONSE: {original_query}
+
+ANSWER BEING EVALUATED:
+{final_answer}
+
+Evaluate if this answer properly addresses the original question using the clarification context.""")
+            ])
+            
+            try:
+                chain = prompt | agent_llm.with_structured_output(AnswerRelevanceOutput)
+                result = await chain.ainvoke({})
+                
+                if result.is_relevant:
+                    logger.info(f"✅ Answer relevance (CLARIFICATION): ALIGNED - {result.relevance_reason[:100]}")
+                    return state
+                else:
+                    logger.info(f"🔄 Answer relevance (CLARIFICATION): REFINED - {result.relevance_reason[:100]}")
+                    return {"final_answer": result.refined_answer, "awaiting_clarification": False}
+            except Exception as e:
+                logger.warning(f"⚠️ Answer relevance check failed for CLARIFICATION, using original: {e}")
+                return state
+        else:
+            # No session found, skip check
+            logger.info("✅ Answer relevance: No clarification session found, skipping")
+            return state
     
     # IMPORTANT: Only refine if the query is a greeting/casual message
     # For actual HR queries that need clarification, preserve the clarifying questions
-    if not is_greeting_or_casual(original_query):
+    # Get conversation history for context-aware detection
+    user_id = state.get("user_id", "default_user")
+    history = get_user_history(user_id, use_summarization=False)
+    conversation_history = history[-5:] if history else []
+    
+    if not is_greeting_or_casual(original_query, conversation_history):
         # This is an actual HR query - don't interfere with clarification
         if awaiting_clarification:
             logger.info(f"✅ Answer relevance: Preserving clarification for HR query")
@@ -2509,6 +2694,8 @@ async def query_endpoint(request: QueryRequest):
         topic_change_detector_instance = components[13]
         conversation_state_machine_instance = components[14]
         unified_clarification_handler_instance = components[15]
+        llm_context_classifier_instance = components[16] if len(components) > 16 else None
+        llm_classifier_instance = components[17] if len(components) > 17 else None
 
         # Get conversation history for context-aware classification
         history = get_user_history(user_id)
@@ -2527,7 +2714,39 @@ async def query_endpoint(request: QueryRequest):
         logger.info(f"👤 User profile for {user_id}: {user_profile}")
 
         # 2. Detect topic changes for smooth transitions
-        if len(history) > 0:
+        # BUT: Use LLM to intelligently determine if user is answering a clarification
+        topic_acknowledgment = None
+        
+        # Check if there's an active clarification session
+        active_clarification = clarification_tracker.get_active_session(user_id)
+        skip_topic_transition = False
+        
+        if active_clarification and llm_context_classifier_instance:
+            # Use LLM with CoT to determine if this is a clarification answer or topic change
+            last_question = getattr(active_clarification, 'questions', [''])[0] if active_clarification else ""
+            original_query = getattr(active_clarification, 'original_query', "") if active_clarification else ""
+            
+            context_classification = llm_context_classifier_instance.classify_user_response(
+                user_response=query_text,
+                conversation_history=history,
+                last_clarification_question=last_question,
+                original_query=original_query
+            )
+            logger.info(f"🧠 LLM Context: {context_classification.classification} "
+                       f"(confidence: {context_classification.confidence:.2f}) "
+                       f"reasoning: {context_classification.reasoning[:100]}...")
+            
+            if context_classification.classification == "clarification_answer":
+                # User is answering the clarification - skip topic transition
+                skip_topic_transition = True
+                logger.info("🎯 User is answering clarification - skipping topic transition")
+            elif context_classification.classification == "topic_change":
+                # User wants to switch topics - gracefully abandon clarification
+                logger.info("🔄 User wants to switch topics - abandoning clarification gracefully")
+                clarification_tracker.abandon_session(user_id)
+                topic_acknowledgment = "No problem, let me help you with that instead."
+        
+        if not skip_topic_transition and len(history) > 0:
             # Get last user message
             last_user_messages = [m for m in history if m.get("role") == "user"]
             if last_user_messages:
@@ -2543,12 +2762,6 @@ async def query_endpoint(request: QueryRequest):
                 if topic_transition.changed and topic_transition.acknowledgment:
                     # Store acknowledgment to prepend to response later
                     topic_acknowledgment = topic_transition.acknowledgment
-                else:
-                    topic_acknowledgment = None
-            else:
-                topic_acknowledgment = None
-        else:
-            topic_acknowledgment = None
 
         # 3. Update conversation state machine
         conversation_state_machine_instance.transition_to_answering(user_id)
@@ -2699,6 +2912,8 @@ async def query_endpoint(request: QueryRequest):
         # Mark new questions (not clarification responses) as original questions
         is_clarification_answer = clarification_tracker.get_active_session(user_id) and \
                                  clarification_tracker.is_clarification_response(user_id, query_text)
+        # Get conversation history for context-aware greeting detection
+        is_obvious_greeting = is_greeting_or_casual(query_text, history)
         is_obvious_greeting = is_greeting_or_casual(query_text)
 
         metadata = {"request_id": request_id}
@@ -2708,15 +2923,59 @@ async def query_endpoint(request: QueryRequest):
 
         conv_manager.add_message(user_id, "user", query_text, metadata)
 
-        # Assess answer quality
+        # Assess answer quality using LLM classifier (zero hardcoding approach)
         sources = result.get("sources", [])
-        graphiti_facts = []  # Will be populated if Graphiti is used
-        quality_assessment = AnswerQuality.assess_answer(
-            answer_text,
-            sources,
-            graphiti_facts,
-            query_text
-        )
+        
+        # Build context string from sources for confidence assessment
+        context_parts = []
+        for source in sources[:5]:  # Use top 5 sources for context
+            source_name = source.get("source", "Unknown")
+            text_content = source.get("text", "") or source.get("content", "")
+            if text_content:
+                context_parts.append(f"Source: {source_name}\nContent: {text_content[:300]}")
+        context_str = "\n\n".join(context_parts) if context_parts else "No context available"
+        
+        # Use LLM classifier for confidence assessment
+        confidence_result = None
+        if llm_classifier_instance:
+            try:
+                confidence_result = llm_classifier_instance.assess_answer_confidence(
+                    query=query_text,
+                    answer=answer_text,
+                    sources=sources,
+                    context=context_str
+                )
+                logger.info(f"📊 LLM Confidence Assessment: {confidence_result.confidence_level.value} "
+                           f"({confidence_result.confidence_score:.0%}) - {confidence_result.reasoning[:100]}")
+            except Exception as e:
+                logger.error(f"Error in LLM confidence assessment: {e}")
+                # Fallback to basic confidence
+                confidence_result = None
+        
+        # Fallback to AnswerQuality if LLM classifier not available or failed
+        if confidence_result is None:
+            graphiti_facts = []  # Will be populated if Graphiti is used
+            quality_assessment = AnswerQuality.assess_answer(
+                answer_text,
+                sources,
+                graphiti_facts,
+                query_text
+            )
+            # Convert to confidence_result format for consistency
+            confidence_level_str = quality_assessment["confidence"]["level"]
+            if confidence_level_str == "high":
+                conf_level = ConfidenceLevel.HIGH
+            elif confidence_level_str == "low":
+                conf_level = ConfidenceLevel.LOW
+            else:
+                conf_level = ConfidenceLevel.MEDIUM
+            confidence_result = AnswerConfidenceResult(
+                confidence_level=conf_level,
+                confidence_score=quality_assessment["confidence"]["score"],
+                source_quality="good" if quality_assessment["grounding"]["is_grounded"] else "fair",
+                has_sufficient_context=True,
+                reasoning="Fallback assessment using AnswerQuality"
+            )
 
         # === NEW: Enhance response for natural conversation ===
         # Get conversation context
@@ -2731,7 +2990,7 @@ async def query_endpoint(request: QueryRequest):
             user_query=query_text,
             context=conv_context,
             metadata={
-                "confidence": quality_assessment["confidence"]["score"],
+                "confidence": confidence_result.confidence_score,
                 "sources": sources,
                 "complexity": complexity
             }
@@ -2754,15 +3013,63 @@ async def query_endpoint(request: QueryRequest):
 
         logger.info(f"Response enhanced: {len(enhancement.improvements_made)} improvements made")
 
+        # Format answer with confidence display and source references using LLM classifier
+        if llm_classifier_instance and confidence_result:
+            final_answer_with_confidence = llm_classifier_instance.format_answer_with_confidence(
+                answer=final_answer,
+                confidence=confidence_result,
+                sources=sources
+            )
+        else:
+            # Fallback: manual formatting if LLM classifier not available
+            confidence_level = confidence_result.confidence_level.value if confidence_result else "medium"
+            confidence_score = confidence_result.confidence_score if confidence_result else 0.5
+            
+            # Get unique source names (top 5 unique sources, sorted by score)
+            source_names = []
+            if sources:
+                # Sort by score (highest first) to prioritize best sources
+                sorted_sources = sorted(sources, key=lambda x: x.get("score", 0), reverse=True)
+                seen = set()
+                for s in sorted_sources[:10]:  # Check top 10 for diversity
+                    source_name = s.get("source", "Unknown").replace(".md", "").replace("HRD - ", "").strip()
+                    if source_name and source_name not in seen:
+                        source_names.append(source_name)
+                        seen.add(source_name)
+                        if len(source_names) >= 5:  # Top 5 unique sources
+                            break
+            if not source_names:
+                source_names = ["Knowledge Base"]
+            source_display = ", ".join(source_names) if source_names else "General Knowledge Base"
+            
+            confidence_footer = "\n\n---\n"
+            if confidence_level == "high":
+                confidence_footer += f"📊 **Confidence:** HIGH ({confidence_score:.0%})\n"
+            elif confidence_level == "medium":
+                confidence_footer += f"📊 **Confidence:** MEDIUM ({confidence_score:.0%})\n"
+            else:
+                confidence_footer += f"⚠️ **Confidence:** LOW ({confidence_score:.0%}) - Information may be incomplete\n"
+            
+            confidence_footer += f"📚 **Sources:** {source_display}\n"
+            if confidence_level == "low":
+                confidence_footer += "💡 **Tip:** Consider contacting HR for verification\n"
+            
+            final_answer_with_confidence = final_answer + confidence_footer
+
         # Save assistant response with quality metadata
         conv_manager.add_message(
             user_id,
             "assistant",
-            final_answer,  # Use enhanced response
+            final_answer_with_confidence,  # Use response with confidence footer
             {
                 "request_id": request_id,
                 "complexity": complexity,
-                "quality": quality_assessment,
+                "confidence": {
+                    "level": confidence_result.confidence_level.value if confidence_result else "medium",
+                    "score": confidence_result.confidence_score if confidence_result else 0.5,
+                    "source_quality": confidence_result.source_quality if confidence_result else "fair",
+                    "reasoning": confidence_result.reasoning if confidence_result else ""
+                },
                 "conversational_enhancements": enhancement.improvements_made
             }
         )
@@ -2770,7 +3077,6 @@ async def query_endpoint(request: QueryRequest):
         # Async save to graphiti
         asyncio.create_task(save_to_graphiti_memory(user_id, query_text, answer_text))
         
-        # Build metadata with quality assessment
         metadata = {
                 "request_id": request_id,
                 "agent": "LangGraph Decomposition",
@@ -2779,14 +3085,17 @@ async def query_endpoint(request: QueryRequest):
             "sources": sources,
             "elapsed_sec": round(total_elapsed, 3),
             "quality": {
-                "confidence": quality_assessment["confidence"]["level"],
-                "confidence_score": quality_assessment["confidence"]["score"],
-                "is_grounded": quality_assessment["grounding"]["is_grounded"]
+                "confidence": confidence_result.confidence_level.value if confidence_result else "medium",
+                "confidence_score": confidence_result.confidence_score if confidence_result else 0.5,
+                "source_quality": confidence_result.source_quality if confidence_result else "fair",
+                "has_sufficient_context": confidence_result.has_sufficient_context if confidence_result else True,
+                "should_show_warning": confidence_result.should_show_warning if confidence_result else False,
+                "warning_message": confidence_result.warning_message if confidence_result else None
             }
         }
         
         return QueryResponse(
-            response=format_gfm_to_html(final_answer),  # Use enhanced response
+            response=format_gfm_to_html(final_answer_with_confidence),
             metadata=metadata
         )
         

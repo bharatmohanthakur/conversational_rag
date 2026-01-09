@@ -293,6 +293,58 @@ class ConversationStateMachine:
             "current_state": session.current_state.value
         }
 
+    def transition_to_answering(self, user_id: str):
+        """
+        Convenience method to transition to ANSWERING state.
+        Called when ready to provide an answer.
+        """
+        session = self.get_session(user_id)
+        session.transition_to(ConversationState.ANSWERING, "ready to answer")
+
+    def get_state(self, user_id: str) -> str:
+        """
+        Get current conversation state for a user.
+        
+        Args:
+            user_id: User ID
+            
+        Returns:
+            Current state as string
+        """
+        session = self.get_session(user_id)
+        return session.current_state.value
+
+    def has_clarified(self, user_id: str) -> bool:
+        """
+        Check if user has already been asked a clarification question.
+        RULE: Only one clarification per conversation.
+        
+        Args:
+            user_id: User ID
+            
+        Returns:
+            True if clarification has already been done
+        """
+        session = self.get_session(user_id)
+        return session.clarification_count > 0
+
+    def transition_to_clarifying(self, user_id: str):
+        """
+        Transition to CLARIFYING state.
+        Called when asking a clarification question.
+        """
+        session = self.get_session(user_id)
+        session.transition_to(ConversationState.CLARIFYING, "asking clarification")
+
+    def mark_clarification_done(self, user_id: str):
+        """
+        Mark that clarification has been completed.
+        Increments the clarification counter to prevent future clarifications.
+        """
+        session = self.get_session(user_id)
+        session.clarification_count += 1
+        logger.info(f"Clarification done for {user_id}, count: {session.clarification_count}")
+
     def reset_session(self, user_id: str):
         """Reset conversation session."""
         if user_id in self.sessions:

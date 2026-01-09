@@ -220,22 +220,45 @@ class ClarificationHandler:
                 retrieval_function=retrieval_function
             )
 
-    def detect_frustration(self, query: str) -> bool:
+    def detect_frustration(self, query: str, conversation_history: Optional[List[Dict]] = None) -> bool:
         """
         Detect if user is frustrated and wants to proceed.
+        Uses LLM classifier with conversation history for natural, context-aware detection.
 
         Args:
             query: User's query
+            conversation_history: Optional conversation history for context
 
         Returns:
             True if frustration detected
         """
+        # Use LLM classifier for intelligent frustration detection
+        from llm_classifier import get_llm_classifier
+        llm_classifier = get_llm_classifier()
+        
+        if llm_classifier:
+            try:
+                is_frustrated, confidence, reasoning = llm_classifier.detect_frustration(
+                    query=query,
+                    conversation_history=conversation_history
+                )
+                
+                if is_frustrated:
+                    logger.info(f"😤 LLM Frustration Detected: {reasoning[:100]} (confidence: {confidence:.0%})")
+                
+                return is_frustrated
+                
+            except Exception as e:
+                logger.warning(f"LLM classifier failed for frustration detection, using fallback: {e}")
+        
+        # Fallback to pattern matching if LLM classifier not available or fails
         query_lower = query.lower().strip()
         return any(signal in query_lower for signal in self.config.frustration_signals)
 
     def is_clarification_answer(self, user_id: str, query: str) -> bool:
         """
         Determine if query is a clarification answer (not a new question).
+        Uses LLM classifier with conversation history and clarification context for natural detection.
 
         Args:
             user_id: User ID
@@ -251,6 +274,44 @@ class ClarificationHandler:
         if session.status != ClarificationStatus.AWAITING.value:
             return False
 
+        # Use LLM classifier for intelligent detection with context
+        from llm_classifier import get_llm_classifier
+        llm_classifier = get_llm_classifier()
+        
+        if llm_classifier:
+            try:
+                # Get conversation history for context
+                conversation_history = []
+                if hasattr(self.tracker, 'conv_manager'):
+                    history = self.tracker.conv_manager.get_history(user_id, limit=10)
+                    conversation_history = [
+                        {"role": msg.get("role"), "content": msg.get("content")}
+                        for msg in history
+                    ]
+                
+                # Get clarification context
+                clarification_question = session.questions[0] if session.questions else None
+                original_query = session.original_query if hasattr(session, 'original_query') else None
+                
+                # Use LLM classifier with full context
+                result = llm_classifier.classify_query(
+                    query=query,
+                    conversation_context=conversation_history,
+                    active_clarification=True,
+                    clarification_question=clarification_question,
+                    original_query=original_query
+                )
+                
+                is_clarification = result.is_clarification_answer
+                logger.info(f"🧠 LLM Clarification Answer Detection: {is_clarification} "
+                           f"(type={result.query_type}, reasoning: {result.reasoning[:100]})")
+                
+                return is_clarification
+                
+            except Exception as e:
+                logger.warning(f"LLM classifier failed for clarification answer detection, using fallback: {e}")
+        
+        # Fallback to pattern matching if LLM classifier not available or fails
         query_lower = query.lower().strip()
 
         # New question indicators
@@ -295,7 +356,16 @@ class ClarificationHandler:
             return None
 
         # Check for frustration
-        if self.detect_frustration(answer):
+        # Get conversation history for context-aware frustration detection
+        conversation_history = None
+        if hasattr(self.tracker, 'conv_manager'):
+            history = self.tracker.conv_manager.get_history(user_id, limit=10)
+            conversation_history = [
+                {"role": msg.get("role"), "content": msg.get("content")}
+                for msg in history
+            ]
+        
+        if self.detect_frustration(answer, conversation_history):
             logger.info(f"User frustration detected: {answer[:50]}")
             session.metadata["frustration_detected"] = True
             self.tracker._save_session(session)

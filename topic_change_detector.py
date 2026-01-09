@@ -212,6 +212,125 @@ class TopicChangeDetector:
 
         return None
 
+    def detect_transition(
+        self,
+        previous_query: str = "",
+        current_query: str = "",
+        conversation_history: Optional[List[Dict]] = None
+    ) -> 'TopicTransitionResult':
+        """
+        Detect topic transition between queries.
+        Uses LLM classifier with conversation history for natural, context-aware detection with CoT reasoning.
+        
+        Args:
+            previous_query: Previous user query
+            current_query: Current user query
+            conversation_history: Conversation history (optional)
+            
+        Returns:
+            TopicTransitionResult with changed and acknowledgment fields
+        """
+        # Try to use LLM classifier for intelligent topic change detection
+        from llm_classifier import get_llm_classifier
+        llm_classifier = get_llm_classifier()
+        
+        if llm_classifier:
+            try:
+                # Build recent queries list for LLM
+                recent_queries = []
+                if previous_query:
+                    recent_queries.append(previous_query)
+                if conversation_history:
+                    for msg in conversation_history[-5:]:
+                        if msg.get("role") == "user":
+                            content = msg.get("content", "")
+                            if content and content not in recent_queries:
+                                recent_queries.append(content)
+                
+                # Detect current topic from previous query
+                current_topic = None
+                if previous_query:
+                    # Extract topic from previous query (simple keyword-based for now)
+                    prev_topics = self._detect_topic_keywords(previous_query)
+                    current_topic = prev_topics[0] if prev_topics else None
+                
+                # Use LLM classifier with conversation history
+                result = llm_classifier.detect_topic_change(
+                    current_query=current_query,
+                    recent_queries=recent_queries,
+                    current_topic=current_topic
+                )
+                
+                # Map LLM result to TopicChangeType
+                if result.is_major_change:
+                    change_type = TopicChangeType.MAJOR_CHANGE
+                elif result.is_minor_shift:
+                    change_type = TopicChangeType.SLIGHT_SHIFT
+                else:
+                    change_type = TopicChangeType.NO_CHANGE
+                
+                changed = result.is_major_change or result.is_minor_shift
+                detected_topic = result.new_topic
+                acknowledgment = result.acknowledgment if result.should_acknowledge else None
+                
+                logger.info(f"🔄 LLM Topic Change: {change_type.value} "
+                           f"(similarity: {result.similarity:.2f}, reasoning: {result.reasoning[:100]})")
+                
+                return TopicTransitionResult(
+                    changed=changed,
+                    change_type=change_type.value,
+                    similarity=result.similarity,
+                    new_topic=detected_topic,
+                    acknowledgment=acknowledgment
+                )
+                
+            except Exception as e:
+                logger.warning(f"LLM classifier failed for topic change detection, using fallback: {e}")
+        
+        # Fallback to original method if LLM classifier not available or fails
+        # Build recent context from previous query
+        recent_context = [previous_query] if previous_query else []
+        if conversation_history:
+            for msg in conversation_history[-5:]:
+                if msg.get("role") == "user":
+                    content = msg.get("content", "")
+                    if content and content not in recent_context:
+                        recent_context.append(content)
+        
+        # Detect topic change using original method
+        change_type, similarity, detected_topic = self.detect_topic_change(
+            current_query, recent_context, None
+        )
+        
+        # Build result
+        changed = change_type in [TopicChangeType.MAJOR_CHANGE, TopicChangeType.SLIGHT_SHIFT]
+        acknowledgment = self.generate_transition_message(change_type, detected_topic)
+        
+        return TopicTransitionResult(
+            changed=changed,
+            change_type=change_type.value,
+            similarity=similarity,
+            new_topic=detected_topic,
+            acknowledgment=acknowledgment
+        )
+
+
+class TopicTransitionResult:
+    """Result of topic transition detection."""
+    def __init__(
+        self,
+        changed: bool = False,
+        change_type: str = "no_change",
+        similarity: float = 1.0,
+        new_topic: Optional[str] = None,
+        acknowledgment: Optional[str] = None
+    ):
+        self.changed = changed
+        self.change_type = change_type
+        self.similarity = similarity
+        self.new_topic = new_topic
+        self.acknowledgment = acknowledgment
+
 
 # Global instance
 _topic_change_detector: Optional[TopicChangeDetector] = None

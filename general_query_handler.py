@@ -14,7 +14,7 @@ import logging
 from openai import AzureOpenAI
 import json
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("RAG-Server")  # Use same logger as main server for visibility
 
 
 class QueryType(Enum):
@@ -195,77 +195,106 @@ Respond ONLY with valid JSON, no other text.
         conversation_history: Optional[List[Dict[str, str]]] = None
     ) -> str:
         """
-        Generate a natural conversational response using LLM.
+        Generate a natural conversational response using LLM with personalized, context-aware responses.
 
         Args:
             query: User query (already classified as general)
             conversation_history: Optional conversation context
 
         Returns:
-            Natural conversational response
+            Natural conversational response with personalization
         """
         try:
-            # Build conversation context
+            logger.info(f"🔄 Generating personalized conversational response for: '{query[:50]}...'")
+            
+            # Build conversation context string for personalization
+            context_str = ""
+            if conversation_history:
+                context_parts = []
+                recent_history = conversation_history[-10:]  # Last 10 messages for context
+                for msg in recent_history:
+                    role = msg.get("role", "unknown")
+                    content = msg.get("content", "")
+                    if content and role in ["user", "assistant"]:
+                        context_parts.append(f"{role.capitalize()}: {content}")
+                if context_parts:
+                    context_str = "\n".join(context_parts[-5:])  # Last 5 messages for context
+                    logger.info(f"📝 Using conversation context: {len(context_parts)} messages")
+            else:
+                logger.info("📝 No conversation history - first interaction")
+
+            # Build messages with personalized, context-aware prompt
             messages = [
                 {
                     "role": "system",
-                    "content": """You are a friendly, helpful HR assistant for an employee knowledge base.
-
-You are responding to a general conversational query (greeting, expression, small talk), NOT a knowledge question.
+                    "content": """You are a friendly, professional HR assistant chatbot. Respond warmly and naturally to greetings, casual messages, or emotional expressions.
 
 Guidelines:
 - Be warm, friendly, and professional
-- Keep responses brief and natural (1-3 sentences)
-- For greetings: Respond warmly and offer to help
+- Keep responses brief (1-2 sentences)
+- Personalize based on conversation history when available
+- If the user has asked questions before, acknowledge continuity naturally
+- If the user says thank you or expresses appreciation, acknowledge it warmly
+- If it's a greeting, greet them back and offer to help with HR questions
+- Vary your responses naturally - don't repeat the same phrase every time
+- Consider the time of day for greetings (good morning/afternoon/evening)
+- If conversation history shows previous topics, you can briefly reference them naturally
 - For expressions: Acknowledge appropriately and stay professional
 - For "how are you": Respond briefly and redirect to helping them
 - For "who are you": Explain you're an HR assistant helping with policies/benefits
-- For thanks: Acknowledge graciously and offer further help
 - Always end by inviting them to ask about HR policies, benefits, or procedures
 
 Examples:
-- "hi" → "Hello! I'm here to help you with HR policies, benefits, and procedures. What can I assist you with today?"
-- "I love you" → "That's very kind of you! I'm here to help with your HR and policy questions. What would you like to know?"
-- "how are you" → "I'm doing great, thank you for asking! I'm here to help with your HR questions. What can I help you with?"
-- "thanks" → "You're very welcome! Let me know if you need anything else about policies or benefits."
+- First greeting: "Hello! I'm here to help you with HR policies, benefits, and procedures. What can I assist you with today?"
+- Returning user: "Hello again! How can I help you with your HR questions today?"
+- After helping: "You're very welcome! Let me know if you need anything else about policies or benefits."
+- Good morning: "Good morning! I'm here to help with your HR questions. What can I assist you with today?"
+- Thank you: "You're welcome! I'm glad I could help. Is there anything else you'd like to know?"
 
-Stay in character as an HR assistant, not a general chatbot.
-"""
+Stay in character as an HR assistant, not a general chatbot."""
                 }
             ]
 
-            # Add conversation history if available
-            if conversation_history:
-                recent_history = conversation_history[-6:]  # Last 3 turns
-                for msg in recent_history:
-                    messages.append({
-                        "role": msg.get("role", "user"),
-                        "content": msg.get("content", "")
-                    })
+            # Build user message with context
+            user_content = f"User's current message: {query}\n\n"
+            if context_str:
+                user_content += f"Recent conversation history:\n{context_str}"
+            else:
+                user_content += "This appears to be the start of the conversation."
 
-            # Add current query
             messages.append({
                 "role": "user",
-                "content": query
+                "content": user_content
             })
 
             response = self.llm_client.chat.completions.create(
                 model=self.deployment_name,
                 messages=messages,
                 temperature=0.7,  # Slightly higher for natural conversation
-                max_tokens=150
+                max_tokens=200  # Increased for more personalized responses
             )
 
             response_text = response.choices[0].message.content.strip()
 
-            logger.info(f"Generated conversational response for: '{query[:50]}...'")
+            logger.info(f"🧠 LLM Generated Personalized Conversational Response: {response_text[:150]}")
+            logger.info(f"📊 Response length: {len(response_text)} chars, Context: {len(conversation_history) if conversation_history else 0} messages")
 
             return response_text
 
         except Exception as e:
-            logger.error(f"Error generating conversational response: {e}")
+            logger.error(f"Error generating personalized conversational response: {e}")
             # Fallback response
-            return "Hello! I'm here to help you with HR policies, benefits, and procedures. What can I assist you with today?"
+            query_lower = query.lower().strip()
+            if "good morning" in query_lower:
+                return "Good morning! How can I assist you with your HR questions today?"
+            elif "good afternoon" in query_lower:
+                return "Good afternoon! How can I help you with your HR questions today?"
+            elif "good evening" in query_lower:
+                return "Good evening! How can I assist you with your HR questions today?"
+            elif "thanks" in query_lower or "thank you" in query_lower:
+                return "You're welcome! Is there anything else I can help you with?"
+            else:
+                return "Hello! I'm here to help you with HR policies, benefits, and procedures. What can I assist you with today?"
 
     def handle_query(
         self,
