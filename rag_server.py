@@ -3168,8 +3168,12 @@ async def query_stream_endpoint(request: QueryRequest):
             query_text = request.query.strip()
             user_id = request.user_id or "default_user"
 
-            # Send initial status
-            yield f"data: {json.dumps({'type': 'status', 'message': 'Processing query...'}, ensure_ascii=False)}\n\n"
+            # ============================================================================
+            # INTERMEDIATE STREAMING: Show progress like Gemini/Claude
+            # ============================================================================
+
+            # Status 1: Initial processing
+            yield f"data: {json.dumps({'type': 'status', 'message': '🤔 Understanding your question...'}, ensure_ascii=False)}\n\n"
 
             log_request(request_id, "🤖 QUERY_START", {"query": query_text})
 
@@ -3187,6 +3191,9 @@ async def query_stream_endpoint(request: QueryRequest):
 
             # Get conversation history
             history = get_user_history(user_id)
+
+            # Status 2: Analyzing context
+            yield f"data: {json.dumps({'type': 'status', 'message': '👤 Analyzing your context...'}, ensure_ascii=False)}\n\n"
 
             # ============================================================================
             # OPTIMIZATION LAYER: User Profile, Topic Detection, State Management
@@ -3296,6 +3303,9 @@ async def query_stream_endpoint(request: QueryRequest):
                 return
 
             # === If not general query, proceed with RAG flow ===
+            # Status 3: Starting knowledge base search
+            yield f"data: {json.dumps({'type': 'status', 'message': '🔍 Searching knowledge base...'}, ensure_ascii=False)}\n\n"
+
             log_request(request_id, "🤖 DEEP_AGENT_START", {"query": query_text})
 
             # Check for clarification
@@ -3349,6 +3359,13 @@ async def query_stream_endpoint(request: QueryRequest):
             answer_text = result.get("final_answer", "No answer generated.")
             complexity = result.get("complexity", "UNKNOWN")
             sources = result.get("sources", [])
+
+            # Status 4: Found sources, analyzing
+            source_count = len(sources)
+            if source_count > 0:
+                yield f"data: {json.dumps({'type': 'status', 'message': f'📊 Found {source_count} sources, analyzing...'}, ensure_ascii=False)}\n\n"
+            else:
+                yield f"data: {json.dumps({'type': 'status', 'message': '📊 Analyzing available information...'}, ensure_ascii=False)}\n\n"
 
             # Log completion
             log_request(request_id, "🤖 DEEP_AGENT_END", {
@@ -3498,6 +3515,10 @@ async def query_stream_endpoint(request: QueryRequest):
             asyncio.create_task(save_to_graphiti_memory(user_id, query_text, answer_text))
 
             total_elapsed = (datetime.now() - start_time).total_seconds()
+
+            # Status 5: Ready to stream response
+            yield f"data: {json.dumps({'type': 'status', 'message': '✨ Crafting response...'}, ensure_ascii=False)}\n\n"
+            await asyncio.sleep(0.3)  # Brief pause before streaming starts
 
             # ============================================================================
             # BEST-IN-CLASS STREAMING (like Gemini, ChatGPT, Claude)
