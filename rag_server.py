@@ -925,8 +925,50 @@ async def query_backup_endpoint(request: QueryRequest):
         history.append({"role": "user", "content": query_text})
         history.append({"role": "assistant", "content": answer_text})
         
-        # 5. Save to Graphiti Memory (persistent, async - don't block response)
-        asyncio.create_task(save_to_graphiti_memory(user_id, query_text, answer_text))
+        # 5. Save to Graphiti Memory with intelligent type classification (persistent, async)
+        async def intelligent_memory_save_simple():
+            """Simplified intelligent memory save for simple query endpoint."""
+            # 1. Always save conversation (episodic memory)
+            await save_to_graphiti_memory(user_id, query_text, answer_text, memory_type="conversation")
+
+            # 2. Detect and save procedural knowledge (workflows, processes, how-to)
+            procedural_keywords = ['how to', 'steps to', 'process for', 'procedure', 'workflow', 'apply for']
+            is_procedural = any(keyword in query_text.lower() for keyword in procedural_keywords)
+            has_steps = any(marker in answer_text for marker in ['Step 1', 'Step 2', '1.', '2.'])
+
+            if is_procedural and has_steps:
+                # Extract steps from answer
+                import re
+                step_pattern = r'(?:Step \d+|^\d+\.)\s*(.+?)(?=\n|$)'
+                steps = re.findall(step_pattern, answer_text, re.MULTILINE)
+                if steps and len(steps) >= 2:
+                    await save_procedural_memory(
+                        user_id,
+                        query_text,
+                        steps,
+                        f"Procedural knowledge from simple query on {datetime.now().strftime('%Y-%m-%d')}"
+                    )
+
+            # 3. Save semantic facts if we have good sources
+            if sources and len(sources) >= 3:  # At least 3 sources indicates good confidence
+                import re
+                sentences = re.split(r'[.!?]+', answer_text)
+                key_facts = []
+                for sent in sentences[:5]:
+                    sent = sent.strip()
+                    if len(sent) > 20 and any(word in sent.lower() for word in ['is', 'are', 'includes', 'provides', 'allows']):
+                        key_facts.append(sent)
+
+                for fact in key_facts[:2]:  # Save top 2 facts
+                    if len(fact) > 20:
+                        source_names = [s.get("source", "").replace(".md", "") for s in sources[:2]]
+                        await save_semantic_fact(
+                            topic=query_text[:100],
+                            fact=fact,
+                            source=", ".join(source_names)
+                        )
+
+        asyncio.create_task(intelligent_memory_save_simple())
         
         # Format response using GFM to HTML
         formatted_response = format_gfm_to_html(answer_text)
@@ -939,6 +981,10 @@ async def query_backup_endpoint(request: QueryRequest):
             "graphiti_facts": len(graphiti_facts)
         })
         
+        # Calculate memory indicators
+        is_procedural_query = any(keyword in query_text.lower() for keyword in ['how to', 'steps', 'process', 'procedure'])
+        has_good_sources = len(sources) >= 3
+
         return QueryResponse(
             response=formatted_response,
             metadata={
@@ -947,6 +993,13 @@ async def query_backup_endpoint(request: QueryRequest):
                 "graphiti_facts_count": len(graphiti_facts),
                 "memory_enabled": GRAPHITI_ENABLED,
                 "elapsed_sec": round(total_elapsed, 3),
+                "memory": {
+                    "types_saved": ["episodic_conversation"],
+                    "episodic": {"conversation": True, "user_profile": False},
+                    "procedural": is_procedural_query and any(marker in answer_text for marker in ['Step 1', 'Step 2', '1.', '2.']),
+                    "semantic": has_good_sources,
+                    "enabled": GRAPHITI_ENABLED
+                }
             }
         )
 
@@ -3227,9 +3280,70 @@ async def query_endpoint(request: QueryRequest):
             }
         )
 
-        # Async save to graphiti
-        asyncio.create_task(save_to_graphiti_memory(user_id, query_text, answer_text))
+        # ============================================================================
+        # BEST-IN-CLASS MEMORY: Save to Graphiti with intelligent type classification
+        # ============================================================================
+        # Save different memory types based on query/answer content
+        async def intelligent_memory_save():
+            """Intelligently save memory to appropriate memory types."""
+            # 1. Always save conversation (episodic memory)
+            await save_to_graphiti_memory(user_id, query_text, answer_text, memory_type="conversation")
+
+            # 2. Save user profile changes if detected (episodic memory - user preferences)
+            if user_profile and hasattr(user_profile_tracker_instance, 'has_profile_changed'):
+                if user_profile_tracker_instance.has_profile_changed(user_id):
+                    profile_data = user_profile_tracker_instance.get_profile(user_id)
+                    await save_user_profile_memory(user_id, profile_data)
+
+            # 3. Detect and save procedural knowledge (workflows, processes, how-to)
+            procedural_keywords = ['how to', 'steps to', 'process for', 'procedure', 'workflow', 'apply for']
+            is_procedural = any(keyword in query_text.lower() for keyword in procedural_keywords)
+            has_steps = any(marker in answer_text for marker in ['Step 1', 'Step 2', '1.', '2.'])
+
+            if is_procedural and has_steps:
+                # Extract steps from answer
+                import re
+                step_pattern = r'(?:Step \d+|^\d+\.)\s*(.+?)(?=\n|$)'
+                steps = re.findall(step_pattern, answer_text, re.MULTILINE)
+                if steps and len(steps) >= 2:
+                    await save_procedural_memory(
+                        user_id,
+                        query_text,
+                        steps,
+                        f"Procedural knowledge extracted from conversation on {datetime.now().strftime('%Y-%m-%d')}"
+                    )
+
+            # 4. Extract and save key facts (semantic memory)
+            # Extract sentences with high confidence from sources
+            if sources and len(sources) > 0 and confidence_result and confidence_result.confidence_level.value == "high":
+                # Extract key sentences from answer (look for specific factual statements)
+                import re
+                # Split into sentences
+                sentences = re.split(r'[.!?]+', answer_text)
+                key_facts = []
+                for sent in sentences[:5]:  # Check first 5 sentences
+                    sent = sent.strip()
+                    # Look for factual statements (contains numbers, "is", "are", "includes")
+                    if len(sent) > 20 and any(word in sent.lower() for word in ['is', 'are', 'includes', 'provides', 'allows']):
+                        key_facts.append(sent)
+
+                # Save top 3 key facts
+                for fact in key_facts[:3]:
+                    if len(fact) > 20:
+                        source_names = [s.get("source", "").replace(".md", "") for s in sources[:2]]
+                        await save_semantic_fact(
+                            topic=query_text[:100],
+                            fact=fact,
+                            source=", ".join(source_names)
+                        )
+
+        # Execute intelligent memory save asynchronously
+        asyncio.create_task(intelligent_memory_save())
         
+        # Calculate memory indicators for metadata
+        is_procedural_query = any(keyword in query_text.lower() for keyword in ['how to', 'steps', 'process', 'procedure'])
+        has_high_confidence = confidence_result and confidence_result.confidence_level.value == "high"
+
         metadata = {
                 "request_id": request_id,
                 "agent": "LangGraph Decomposition",
@@ -3244,6 +3358,13 @@ async def query_endpoint(request: QueryRequest):
                 "has_sufficient_context": confidence_result.has_sufficient_context if confidence_result else True,
                 "should_show_warning": confidence_result.should_show_warning if confidence_result else False,
                 "warning_message": confidence_result.warning_message if confidence_result else None
+            },
+            "memory": {
+                "types_saved": ["episodic_conversation"],  # Will include: user_profile, procedural, semantic
+                "episodic": {"conversation": True, "user_profile": bool(user_profile)},
+                "procedural": is_procedural_query and any(marker in answer_text for marker in ['Step 1', 'Step 2', '1.', '2.']),
+                "semantic": bool(sources and has_high_confidence),
+                "enabled": GRAPHITI_ENABLED
             }
         }
         
