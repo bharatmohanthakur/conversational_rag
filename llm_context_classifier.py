@@ -111,7 +111,8 @@ Respond with a JSON object:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,  # Low temperature for consistent classification
-                max_tokens=500
+                max_tokens=500,
+                response_format={"type": "json_object"}
             )
             
             result_text = response.choices[0].message.content.strip()

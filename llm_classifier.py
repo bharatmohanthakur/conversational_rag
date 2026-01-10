@@ -246,7 +246,8 @@ Respond with JSON:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
-                max_tokens=600
+                max_tokens=600,
+                response_format={"type": "json_object"}
             )
             
             result_text = response.choices[0].message.content.strip()
@@ -365,7 +366,8 @@ Respond with JSON:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
-                max_tokens=400
+                max_tokens=400,
+                response_format={"type": "json_object"}
             )
             
             result_text = response.choices[0].message.content.strip()
@@ -465,7 +467,8 @@ Respond with JSON:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
-                max_tokens=400
+                max_tokens=400,
+                response_format={"type": "json_object"}
             )
             
             result_text = response.choices[0].message.content.strip()
@@ -559,7 +562,8 @@ Respond with JSON:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
-                max_tokens=200
+                max_tokens=200,
+                response_format={"type": "json_object"}
             )
             
             result_text = response.choices[0].message.content.strip()
@@ -653,7 +657,8 @@ Respond with JSON:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
-                max_tokens=400
+                max_tokens=400,
+                response_format={"type": "json_object"}
             )
             
             result_text = response.choices[0].message.content.strip()
