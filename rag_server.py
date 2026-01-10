@@ -573,6 +573,348 @@ async def save_semantic_fact(topic: str, fact: str, source: str = "") -> bool:
     return await save_to_graphiti_memory("system", topic, fact_with_source, memory_type="semantic")
 
 
+# ============================================================================
+# BEST PRACTICE: Enhanced Graphiti Context Retrieval
+# ============================================================================
+# Following recommendation to use Graphiti for contextual understanding:
+# 1. Pre-query context retrieval (user profile, preferences)
+# 2. Conversation history search (related past interactions)
+# 3. Temporal understanding (conversation flow over time)
+# 4. Personalized context (user-specific patterns)
+
+async def get_user_context_from_graphiti(user_id: str, num_results: int = 5) -> Dict[str, Any]:
+    """
+    BEST PRACTICE: Retrieve user context from Graphiti BEFORE query processing.
+
+    Returns comprehensive user context including:
+    - User profile and preferences
+    - Recent conversation patterns
+    - Temporal conversation flow
+
+    This enables personalized, context-aware responses.
+
+    Args:
+        user_id: User identifier
+        num_results: Number of context facts to retrieve
+
+    Returns:
+        Dict with user profile, preferences, and recent interactions
+    """
+    graphiti = await get_graphiti()
+    if not graphiti:
+        return {
+            "user_profile": {},
+            "recent_conversations": [],
+            "preferences": {},
+            "temporal_context": {}
+        }
+
+    try:
+        # 1. Get user profile from Graphiti
+        user_profile_query = f"user profile preferences for {user_id}"
+        profile_facts = await search_graphiti_memory(
+            user_profile_query,
+            num_results=num_results,
+            memory_types=["user_profile"]
+        )
+
+        # Extract profile data
+        user_profile = {}
+        for fact in profile_facts:
+            fact_text = fact.get("fact", "")
+            if "Profile Data:" in fact_text:
+                # Parse profile data from fact
+                profile_section = fact_text.split("Profile Data:")[1].split("This captures")[0].strip()
+                for line in profile_section.split("\n"):
+                    if ":" in line:
+                        key, value = line.split(":", 1)
+                        user_profile[key.strip("- ").strip()] = value.strip()
+
+        # 2. Get recent conversations for context
+        conversation_query = f"recent conversations with {user_id}"
+        recent_convos = await search_graphiti_memory(
+            conversation_query,
+            num_results=num_results,
+            memory_types=["conversation"]
+        )
+
+        # 3. Extract temporal context (conversation flow)
+        temporal_context = {
+            "conversation_count": len(recent_convos),
+            "time_range": {
+                "earliest": min([f.get("valid_at") for f in recent_convos]) if recent_convos else None,
+                "latest": max([f.get("valid_at") for f in recent_convos]) if recent_convos else None
+            }
+        }
+
+        logger.info(f"📋 Retrieved user context from Graphiti: profile={len(user_profile)} keys, "
+                   f"conversations={len(recent_convos)}")
+
+        return {
+            "user_profile": user_profile,
+            "recent_conversations": recent_convos,
+            "preferences": user_profile,  # Same as profile for now
+            "temporal_context": temporal_context
+        }
+
+    except Exception as e:
+        logger.error(f"⚠️ Error retrieving user context from Graphiti: {e}")
+        return {
+            "user_profile": {},
+            "recent_conversations": [],
+            "preferences": {},
+            "temporal_context": {}
+        }
+
+
+async def search_conversation_history_graphiti(
+    query: str,
+    user_id: str,
+    num_results: int = 5,
+    include_temporal: bool = True
+) -> List[Dict[str, Any]]:
+    """
+    BEST PRACTICE: Search conversation history from Graphiti for related past interactions.
+
+    This provides context from similar previous conversations, enabling:
+    - Follow-up question understanding
+    - Context continuity across sessions
+    - Pattern recognition in user queries
+
+    Args:
+        query: Current query to find related conversations
+        user_id: User identifier
+        num_results: Number of historical conversations to retrieve
+        include_temporal: Include temporal flow information
+
+    Returns:
+        List of related past conversations with temporal context
+    """
+    graphiti = await get_graphiti()
+    if not graphiti:
+        return []
+
+    try:
+        # Search for related conversations from this user
+        search_query = f"{query} {user_id}"
+        related_conversations = await search_graphiti_memory(
+            search_query,
+            num_results=num_results,
+            memory_types=["conversation"]
+        )
+
+        # Enrich with temporal context if requested
+        if include_temporal:
+            for conv in related_conversations:
+                valid_at = conv.get("valid_at")
+                if valid_at and valid_at != "None":
+                    try:
+                        from datetime import datetime as dt
+                        valid_time = dt.fromisoformat(valid_at.replace("Z", "+00:00"))
+                        time_ago = datetime.now(timezone.utc) - valid_time
+                        conv["time_ago_hours"] = time_ago.total_seconds() / 3600
+                        conv["is_recent"] = time_ago.total_seconds() < 86400  # Within 24h
+                    except:
+                        conv["time_ago_hours"] = None
+                        conv["is_recent"] = False
+
+        logger.info(f"🔍 Found {len(related_conversations)} related conversations for: {query[:50]}")
+        return related_conversations
+
+    except Exception as e:
+        logger.error(f"⚠️ Error searching conversation history: {e}")
+        return []
+
+
+async def get_temporal_conversation_flow(
+    user_id: str,
+    time_window_hours: int = 24,
+    num_results: int = 10
+) -> Dict[str, Any]:
+    """
+    BEST PRACTICE: Understand temporal conversation flow over time.
+
+    Analyzes conversation patterns to provide:
+    - Topic evolution over time
+    - Query frequency patterns
+    - Session boundaries
+    - Conversation momentum
+
+    Args:
+        user_id: User identifier
+        time_window_hours: Time window to analyze (default 24h)
+        num_results: Maximum conversations to analyze
+
+    Returns:
+        Dict with temporal flow analysis
+    """
+    graphiti = await get_graphiti()
+    if not graphiti:
+        return {
+            "conversation_flow": [],
+            "topic_evolution": [],
+            "session_count": 0,
+            "query_frequency": 0.0
+        }
+
+    try:
+        # Get recent conversations with temporal data
+        conversations = await search_graphiti_memory(
+            f"conversations with {user_id}",
+            num_results=num_results,
+            memory_types=["conversation"]
+        )
+
+        # Parse temporal information
+        from datetime import datetime as dt
+        timed_conversations = []
+        for conv in conversations:
+            valid_at = conv.get("valid_at")
+            if valid_at and valid_at != "None":
+                try:
+                    valid_time = dt.fromisoformat(valid_at.replace("Z", "+00:00"))
+                    time_ago = datetime.now(timezone.utc) - valid_time
+                    hours_ago = time_ago.total_seconds() / 3600
+
+                    if hours_ago <= time_window_hours:
+                        timed_conversations.append({
+                            "fact": conv.get("fact"),
+                            "timestamp": valid_time,
+                            "hours_ago": hours_ago
+                        })
+                except:
+                    pass
+
+        # Sort by timestamp
+        timed_conversations.sort(key=lambda x: x["timestamp"])
+
+        # Calculate session boundaries (gap > 1 hour = new session)
+        sessions = []
+        current_session = []
+        for conv in timed_conversations:
+            if current_session:
+                last_time = current_session[-1]["timestamp"]
+                time_gap = (conv["timestamp"] - last_time).total_seconds() / 3600
+                if time_gap > 1.0:  # New session if gap > 1 hour
+                    sessions.append(current_session)
+                    current_session = [conv]
+                else:
+                    current_session.append(conv)
+            else:
+                current_session = [conv]
+
+        if current_session:
+            sessions.append(current_session)
+
+        # Calculate query frequency (queries per hour)
+        query_frequency = len(timed_conversations) / time_window_hours if time_window_hours > 0 else 0
+
+        logger.info(f"⏰ Temporal analysis: {len(timed_conversations)} conversations, "
+                   f"{len(sessions)} sessions, {query_frequency:.2f} queries/hour")
+
+        return {
+            "conversation_flow": timed_conversations,
+            "topic_evolution": [c["fact"][:100] for c in timed_conversations],
+            "session_count": len(sessions),
+            "query_frequency": query_frequency,
+            "sessions": sessions
+        }
+
+    except Exception as e:
+        logger.error(f"⚠️ Error in temporal flow analysis: {e}")
+        return {
+            "conversation_flow": [],
+            "topic_evolution": [],
+            "session_count": 0,
+            "query_frequency": 0.0
+        }
+
+
+async def enhance_query_with_graphiti_context(
+    query: str,
+    user_id: str,
+    conversation_history: List[Dict[str, str]] = None
+) -> Dict[str, Any]:
+    """
+    BEST PRACTICE: Enhance query understanding with Graphiti context.
+
+    Combines multiple Graphiti context sources:
+    1. User profile and preferences
+    2. Related past conversations
+    3. Temporal conversation flow
+    4. Personalized patterns
+
+    This provides rich context for better query understanding and response generation.
+
+    Args:
+        query: Current user query
+        user_id: User identifier
+        conversation_history: Recent conversation history (optional)
+
+    Returns:
+        Enhanced context dict with all Graphiti-derived context
+    """
+    try:
+        # Run multiple Graphiti queries in parallel for efficiency
+        import asyncio
+        user_context_task = get_user_context_from_graphiti(user_id, num_results=3)
+        history_search_task = search_conversation_history_graphiti(query, user_id, num_results=3)
+        temporal_flow_task = get_temporal_conversation_flow(user_id, time_window_hours=24, num_results=5)
+
+        user_context, history_search, temporal_flow = await asyncio.gather(
+            user_context_task,
+            history_search_task,
+            temporal_flow_task,
+            return_exceptions=True
+        )
+
+        # Handle exceptions
+        if isinstance(user_context, Exception):
+            logger.error(f"User context retrieval failed: {user_context}")
+            user_context = {"user_profile": {}, "recent_conversations": [], "preferences": {}}
+        if isinstance(history_search, Exception):
+            logger.error(f"History search failed: {history_search}")
+            history_search = []
+        if isinstance(temporal_flow, Exception):
+            logger.error(f"Temporal flow failed: {temporal_flow}")
+            temporal_flow = {"conversation_flow": [], "session_count": 0}
+
+        # Build enhanced context
+        enhanced_context = {
+            "query": query,
+            "user_id": user_id,
+            "user_profile": user_context.get("user_profile", {}),
+            "preferences": user_context.get("preferences", {}),
+            "related_conversations": history_search,
+            "temporal_flow": temporal_flow,
+            "context_summary": {
+                "has_profile": bool(user_context.get("user_profile")),
+                "related_conversation_count": len(history_search),
+                "session_count": temporal_flow.get("session_count", 0),
+                "is_active_session": temporal_flow.get("query_frequency", 0) > 0.5
+            }
+        }
+
+        logger.info(f"🚀 Enhanced query with Graphiti context: "
+                   f"profile={bool(enhanced_context['user_profile'])}, "
+                   f"related_convos={len(history_search)}, "
+                   f"sessions={enhanced_context['context_summary']['session_count']}")
+
+        return enhanced_context
+
+    except Exception as e:
+        logger.error(f"⚠️ Error enhancing query with Graphiti context: {e}")
+        return {
+            "query": query,
+            "user_id": user_id,
+            "user_profile": {},
+            "preferences": {},
+            "related_conversations": [],
+            "temporal_flow": {},
+            "context_summary": {}
+        }
+
+
 # ---------------------------------------------------------------------
 # Models (Matching api_server.py)
 # ---------------------------------------------------------------------
@@ -2889,16 +3231,33 @@ async def query_endpoint(request: QueryRequest):
         history = get_user_history(user_id)
 
         # ============================================================================
+        # BEST PRACTICE: Pre-query Graphiti Context Retrieval
+        # ============================================================================
+        # Retrieve user context from Graphiti BEFORE processing query
+        # This provides: user profile, preferences, related conversations, temporal flow
+        graphiti_context = await enhance_query_with_graphiti_context(query_text, user_id, history)
+
+        # Log Graphiti context retrieval
+        logger.info(f"🚀 Graphiti context: profile={graphiti_context['context_summary']['has_profile']}, "
+                   f"related={graphiti_context['context_summary']['related_conversation_count']}, "
+                   f"sessions={graphiti_context['context_summary']['session_count']}")
+
+        # ============================================================================
         # OPTIMIZATION LAYER: User Profile, Topic Detection, State Management
         # ============================================================================
 
-        # 1. Extract and remember user context (role, country, department)
+        # 1. Extract and remember user context (role, country, department) - enhanced with Graphiti
         user_profile_tracker_instance.update_from_query(
             user_id=user_id,
             query=query_text,
             conversation_history=history
         )
         user_profile = user_profile_tracker_instance.get_profile(user_id)
+
+        # Merge Graphiti profile with local tracker profile
+        if graphiti_context.get('user_profile'):
+            user_profile.update(graphiti_context['user_profile'])
+
         logger.info(f"👤 User profile for {user_id}: {user_profile}")
 
         # 2. Detect topic changes for smooth transitions
@@ -3044,7 +3403,7 @@ async def query_endpoint(request: QueryRequest):
                 if len(user_messages) >= 1:
                     original_user_query = user_messages[-1].get("content", "")
 
-        # Initial state used rewritten query for better routing and retrieval
+        # Initial state used rewritten query for better routing and retrieval + Graphiti context
         initial_state = {
             "original_query": rewritten_query,
             "user_id": user_id,
@@ -3066,7 +3425,11 @@ async def query_endpoint(request: QueryRequest):
             "greeting_type": None,
             # Optimization layer data
             "user_profile": user_profile,  # Pass user context to RAG system
-            "topic_acknowledgment": topic_acknowledgment  # Topic transition acknowledgment
+            "topic_acknowledgment": topic_acknowledgment,  # Topic transition acknowledgment
+            # BEST PRACTICE: Include Graphiti context for enhanced understanding
+            "graphiti_context": graphiti_context,
+            "graphiti_related_conversations": graphiti_context.get('related_conversations', []),
+            "graphiti_temporal_flow": graphiti_context.get('temporal_flow', {})
         }
         
         # Invoke LangGraph
@@ -3472,16 +3835,33 @@ async def query_stream_endpoint(request: QueryRequest):
             await asyncio.sleep(0)  # Force immediate flush
 
             # ============================================================================
+            # BEST PRACTICE: Pre-query Graphiti Context Retrieval
+            # ============================================================================
+            # Retrieve user context from Graphiti BEFORE processing query
+            # This provides: user profile, preferences, related conversations, temporal flow
+            graphiti_context = await enhance_query_with_graphiti_context(query_text, user_id, history)
+
+            # Log Graphiti context retrieval
+            logger.info(f"🚀 Graphiti context: profile={graphiti_context['context_summary']['has_profile']}, "
+                       f"related={graphiti_context['context_summary']['related_conversation_count']}, "
+                       f"sessions={graphiti_context['context_summary']['session_count']}")
+
+            # ============================================================================
             # OPTIMIZATION LAYER: User Profile, Topic Detection, State Management
             # ============================================================================
 
-            # 1. Extract and remember user context
+            # 1. Extract and remember user context (enhanced with Graphiti)
             user_profile_tracker_instance.update_from_query(
                 user_id=user_id,
                 query=query_text,
                 conversation_history=history
             )
             user_profile = user_profile_tracker_instance.get_profile(user_id)
+
+            # Merge Graphiti profile with local tracker profile
+            if graphiti_context.get('user_profile'):
+                user_profile.update(graphiti_context['user_profile'])
+
             logger.info(f"👤 User profile for {user_id}: {user_profile}")
 
             # 2. Detect topic changes
@@ -3617,7 +3997,7 @@ async def query_stream_endpoint(request: QueryRequest):
                     if len(user_messages) >= 1:
                         original_user_query = user_messages[-1].get("content", "")
 
-            # Initial state with optimization data
+            # Initial state with optimization data + Graphiti context
             initial_state = {
                 "original_query": rewritten_query,
                 "user_id": user_id,
@@ -3636,7 +4016,11 @@ async def query_stream_endpoint(request: QueryRequest):
                 "is_greeting": False,
                 "greeting_type": None,
                 "user_profile": user_profile,
-                "topic_acknowledgment": topic_acknowledgment
+                "topic_acknowledgment": topic_acknowledgment,
+                # BEST PRACTICE: Include Graphiti context for enhanced understanding
+                "graphiti_context": graphiti_context,
+                "graphiti_related_conversations": graphiti_context.get('related_conversations', []),
+                "graphiti_temporal_flow": graphiti_context.get('temporal_flow', {})
             }
 
             # Invoke LangGraph - this is where the heavy lifting happens
