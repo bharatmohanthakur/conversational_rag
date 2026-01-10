@@ -381,61 +381,196 @@ async def get_graphiti() -> Optional[Graphiti]:
 
 @retry_with_backoff(max_retries=3, initial_delay=1.0, exceptions=(Exception,))
 @with_timeout(timeout_seconds=10.0)
-async def search_graphiti_memory(query: str, num_results: int = 5) -> List[Dict[str, Any]]:
-    """Search the Graphiti knowledge graph for relevant facts using group_id for isolation."""
+async def search_graphiti_memory(query: str, num_results: int = 5, memory_types: list = None) -> List[Dict[str, Any]]:
+    """
+    Search the Graphiti knowledge graph for relevant facts with memory type filtering.
+
+    Args:
+        query: Search query
+        num_results: Number of results to return
+        memory_types: Filter by memory types: ['conversation', 'user_profile', 'procedural', 'semantic']
+                     If None, searches all types
+
+    Returns:
+        List of facts with memory type annotations for best-in-class memory integration
+    """
     graphiti = await get_graphiti()
     if not graphiti:
         return []
-    
+
     circuit = get_graphiti_circuit()
     try:
         results = await circuit.acall(
             graphiti.search,
-            query, 
-            num_results=num_results,
+            query,
+            num_results=num_results * 2,  # Get more results for filtering by type
             group_ids=[GRAPHITI_GROUP_ID],  # Filter by group_id for data isolation
         )
         facts = []
         for r in results:
-            facts.append({
-                "uuid": getattr(r, "uuid", None),
-                "fact": getattr(r, "fact", ""),
-                "valid_at": str(getattr(r, "valid_at", None)),
-                "invalid_at": str(getattr(r, "invalid_at", None)),
-                "source_node_uuid": getattr(r, "source_node_uuid", None),
-                "group_id": GRAPHITI_GROUP_ID,
-            })
-        logger.info(f"🧠 Graphiti search with group_id={GRAPHITI_GROUP_ID} returned {len(facts)} facts")
+            fact_text = getattr(r, "fact", "")
+
+            # Determine memory type from episode content markers
+            memory_type = "conversation"  # default
+            if "[USER PROFILE UPDATE]" in fact_text:
+                memory_type = "user_profile"  # Episodic: user preferences, patterns
+            elif "[PROCEDURAL KNOWLEDGE]" in fact_text:
+                memory_type = "procedural"  # Procedural: workflows, processes
+            elif "[SEMANTIC KNOWLEDGE]" in fact_text:
+                memory_type = "semantic"  # Semantic: facts, entities, relationships
+            elif "[CONVERSATION]" in fact_text:
+                memory_type = "conversation"  # Episodic: conversation history
+
+            # Apply memory type filter if specified
+            if memory_types is None or memory_type in memory_types:
+                facts.append({
+                    "uuid": getattr(r, "uuid", None),
+                    "fact": fact_text,
+                    "memory_type": memory_type,  # NEW: Memory classification
+                    "valid_at": str(getattr(r, "valid_at", None)),
+                    "invalid_at": str(getattr(r, "invalid_at", None)),
+                    "source_node_uuid": getattr(r, "source_node_uuid", None),
+                    "group_id": GRAPHITI_GROUP_ID,
+                })
+
+            # Stop when we have enough results
+            if len(facts) >= num_results:
+                break
+
+        logger.info(f"🧠 Graphiti search (types={memory_types or 'all'}) returned {len(facts)} facts")
         return facts
     except Exception as e:
         logger.error(f"⚠️ Graphiti search error: {e}")
         return []
 
 
-async def save_to_graphiti_memory(user_id: str, query: str, answer: str) -> bool:
-    """Save a Q&A interaction as an episode to Graphiti for long-term memory with group_id."""
+async def save_to_graphiti_memory(user_id: str, query: str, answer: str, memory_type: str = "conversation") -> bool:
+    """
+    Save interactions to Graphiti with proper memory type classification.
+
+    Memory Types (Best-in-class implementation):
+    - 'conversation': Regular Q&A episodic memory
+    - 'user_profile': User preferences, patterns, behaviors (episodic)
+    - 'procedural': Workflows, processes, how-to knowledge
+    - 'semantic': Learned facts, entities, relationships
+    """
     graphiti = await get_graphiti()
     if not graphiti:
         return False
-    
-    try:
-        episode_content = f"""User ({user_id}) asked: {query}
 
-Assistant answered: {answer}"""
-        
+    try:
+        # Classify memory type and create appropriate episode content
+        if memory_type == "user_profile":
+            # EPISODIC: User profile, preferences, behavior patterns
+            episode_content = f"""[USER PROFILE UPDATE]
+User: {user_id}
+Context: {query}
+Profile Data: {answer}
+
+This captures episodic user information like preferences, patterns, and behavioral context."""
+            source_desc = f"User profile update for {user_id}"
+            episode_name = f"profile_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+        elif memory_type == "procedural":
+            # PROCEDURAL: Workflows, processes, step-by-step procedures
+            episode_content = f"""[PROCEDURAL KNOWLEDGE]
+Process Query: {query}
+Procedure: {answer}
+
+This captures procedural knowledge - how to perform tasks, workflows, step-by-step processes."""
+            source_desc = f"Procedural knowledge about: {query[:100]}"
+            episode_name = f"procedure_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+        elif memory_type == "semantic":
+            # SEMANTIC: Learned facts, entities, relationships
+            episode_content = f"""[SEMANTIC KNOWLEDGE]
+Topic: {query}
+Learned Fact: {answer}
+
+This captures semantic knowledge - facts, entities, relationships learned from conversations."""
+            source_desc = f"Semantic knowledge about: {query[:100]}"
+            episode_name = f"semantic_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+        else:  # Default: conversation (episodic)
+            # EPISODIC: Conversation history
+            episode_content = f"""[CONVERSATION]
+User ({user_id}) asked: {query}
+
+Assistant answered: {answer}
+
+This is an episodic conversation memory."""
+            source_desc = f"RAG conversation with user {user_id}"
+            episode_name = f"conversation_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
         await graphiti.add_episode(
-            name=f"conversation_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+            name=episode_name,
             episode_body=episode_content,
             source=EpisodeType.text,
-            source_description=f"RAG conversation with user {user_id}",
+            source_description=source_desc,
             reference_time=datetime.now(timezone.utc),
             group_id=GRAPHITI_GROUP_ID,  # Assign to group_id for isolation
         )
-        logger.info(f"💾 Saved conversation to Graphiti (group_id={GRAPHITI_GROUP_ID}) for user: {user_id}")
+        logger.info(f"💾 Saved {memory_type} memory to Graphiti (group_id={GRAPHITI_GROUP_ID})")
         return True
     except Exception as e:
-        logger.error(f"⚠️ Failed to save to Graphiti: {e}")
+        logger.error(f"⚠️ Failed to save {memory_type} memory to Graphiti: {e}")
         return False
+
+
+async def save_procedural_memory(user_id: str, process_name: str, steps: list, context: str = "") -> bool:
+    """
+    Save procedural memory - workflows, processes, how-to knowledge.
+    This is a specialized function for capturing step-by-step procedures.
+
+    Example:
+        save_procedural_memory(
+            "user123",
+            "How to apply for maternity leave",
+            ["Step 1: Fill form", "Step 2: Submit to manager", "Step 3: Wait for approval"],
+            "Maternity leave application process"
+        )
+    """
+    steps_str = "\n".join(f"{i+1}. {step}" for i, step in enumerate(steps))
+    procedure_content = f"""Process: {process_name}
+
+{context}
+
+Steps:
+{steps_str}"""
+
+    return await save_to_graphiti_memory(user_id, process_name, procedure_content, memory_type="procedural")
+
+
+async def save_user_profile_memory(user_id: str, profile_updates: dict) -> bool:
+    """
+    Save episodic user profile memory - preferences, patterns, behaviors.
+
+    Example:
+        save_user_profile_memory(
+            "user123",
+            {"department": "Engineering", "location": "Dubai", "language_preference": "English"}
+        )
+    """
+    profile_str = "\n".join(f"- {k}: {v}" for k, v in profile_updates.items())
+    query = f"User profile update at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+
+    return await save_to_graphiti_memory(user_id, query, profile_str, memory_type="user_profile")
+
+
+async def save_semantic_fact(topic: str, fact: str, source: str = "") -> bool:
+    """
+    Save semantic memory - learned facts, entities, relationships.
+
+    Example:
+        save_semantic_fact(
+            "Maternity Leave Policy",
+            "Maternity leave is 16 weeks with full pay",
+            "HR Policy Document"
+        )
+    """
+    fact_with_source = f"{fact}\n\nSource: {source}" if source else fact
+
+    return await save_to_graphiti_memory("system", topic, fact_with_source, memory_type="semantic")
 
 
 # ---------------------------------------------------------------------
@@ -3604,8 +3739,58 @@ async def query_stream_endpoint(request: QueryRequest):
                 "conversational_enhancements": enhancement.improvements_made
             })
 
-            # Async save to graphiti
-            asyncio.create_task(save_to_graphiti_memory(user_id, query_text, answer_text))
+            # ============================================================================
+            # BEST-IN-CLASS MEMORY: Save to Graphiti with intelligent type classification
+            # ============================================================================
+            # Save different memory types based on query/answer content
+            async def intelligent_memory_save():
+                """Intelligently save memory to appropriate memory types."""
+                # 1. Always save conversation (episodic memory)
+                await save_to_graphiti_memory(user_id, query_text, answer_text, memory_type="conversation")
+
+                # 2. Save user profile changes if detected (episodic memory - user preferences)
+                if user_profile and hasattr(user_profile_tracker_instance, 'has_profile_changed'):
+                    if user_profile_tracker_instance.has_profile_changed(user_id):
+                        profile_data = user_profile_tracker_instance.get_profile(user_id)
+                        await save_user_profile_memory(user_id, profile_data)
+
+                # 3. Detect and save procedural knowledge (workflows, processes, how-to)
+                procedural_keywords = ['how to', 'steps to', 'process for', 'procedure', 'workflow', 'apply for']
+                is_procedural = any(keyword in query_text.lower() for keyword in procedural_keywords)
+                has_steps = any(marker in answer_text for marker in ['Step 1', 'Step 2', '1.', '2.'])
+
+                if is_procedural and has_steps:
+                    # Extract steps from answer
+                    import re
+                    step_pattern = r'(?:Step \d+|^\d+\.)\s*(.+?)(?=\n|$)'
+                    steps = re.findall(step_pattern, answer_text, re.MULTILINE)
+                    if steps and len(steps) >= 2:
+                        await save_procedural_memory(
+                            user_id,
+                            query_text,
+                            steps,
+                            f"Procedural knowledge extracted from conversation on {datetime.now().strftime('%Y-%m-%d')}"
+                        )
+
+                # 4. Extract and save key facts (semantic memory)
+                # Extract sentences with high confidence from sources
+                if sources and len(sources) > 0 and confidence_result and confidence_result.confidence_level.value == "high":
+                    # Extract key facts from answer (sentences with inline citations)
+                    import re
+                    cited_sentences = re.findall(r'([^.!?]+\[\d+\][.!?])', answer_text)
+                    for sent in cited_sentences[:3]:  # Save top 3 key facts
+                        # Remove citation markers for clean fact storage
+                        clean_fact = re.sub(r'\[\d+\]', '', sent).strip()
+                        if len(clean_fact) > 20:  # Only meaningful facts
+                            source_names = [s.get("source", "").replace(".md", "") for s in sources[:2]]
+                            await save_semantic_fact(
+                                topic=query_text[:100],
+                                fact=clean_fact,
+                                source=", ".join(source_names)
+                            )
+
+            # Execute intelligent memory save asynchronously
+            asyncio.create_task(intelligent_memory_save())
 
             total_elapsed = (datetime.now() - start_time).total_seconds()
 
@@ -3727,7 +3912,14 @@ async def query_stream_endpoint(request: QueryRequest):
                         "estimated_input_tokens": len(query_text.split()) + sum(len(s.get("text", "").split()) for s in sources[:5]),
                         "estimated_total_tokens": token_count + len(query_text.split())
                     },
-                    "citations": citation_map if citation_map else {}
+                    "citations": citation_map if citation_map else {},
+                    "memory": {
+                        "types_saved": ["episodic_conversation"],  # Will include: user_profile, procedural, semantic
+                        "episodic": {"conversation": True, "user_profile": bool(user_profile)},
+                        "procedural": any(keyword in query_text.lower() for keyword in ['how to', 'steps', 'process', 'procedure']),
+                        "semantic": bool(sources and confidence_result and confidence_result.confidence_level.value == "high"),
+                        "enabled": GRAPHITI_ENABLED
+                    }
                 }
             }
             yield f"data: {json.dumps(final_metadata, ensure_ascii=False)}\n\n"
