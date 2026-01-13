@@ -1294,7 +1294,7 @@ async def query_backup_endpoint(request: QueryRequest):
             model=AZURE_CHAT_DEPLOYMENT,
             messages=messages,
             temperature=0.0,
-            max_tokens=1500,
+            max_tokens=3000,  # Increased to prevent answer truncation and ensure completeness
         )
         llm_elapsed = (datetime.now() - llm_start).total_seconds()
         
@@ -1465,11 +1465,11 @@ async def _retrieve_single_query(query: str, user_id: str, use_advanced_rag: boo
                         lambda: qdrant_client.query_points(
             collection_name=COLLECTION_NAME,
             prefetch=[
-                                qm.Prefetch(query=dense_q,  using=rag_impl.DENSE_NAME,  limit=15),
-                                qm.Prefetch(query=sparse_q, using=rag_impl.SPARSE_NAME, limit=15),
+                                qm.Prefetch(query=dense_q,  using=rag_impl.DENSE_NAME,  limit=20),  # Increased for better coverage
+                                qm.Prefetch(query=sparse_q, using=rag_impl.SPARSE_NAME, limit=20),  # Increased for better coverage
             ],
             query=qm.FusionQuery(fusion=qm.Fusion.RRF),
-                            limit=7,  # Reduced to 7 documents for faster processing
+                            limit=10,  # Increased to 10 documents for better accuracy and completeness
                         )
                     )
                 )
@@ -2042,7 +2042,11 @@ async def simple_rag_node(state: AgentState):
     context = search_result["context"]
     sources = search_result["sources"]
     retrieved_images = search_result.get("images", [])
-    
+
+    # ACCURACY LOGGING: Track source utilization
+    logger.info(f"🔍 Retrieved {len(sources)} sources for query: {query[:50]}...")
+    logger.info(f"📊 Context size: {len(context)} chars from {len(sources)} sources")
+
     # Check if we have both workflow (- W) and normal documents
     workflow_sources = [s for s in sources if " - W " in s.get("source", "") or " - W-" in s.get("source", "")]
     normal_sources = [s for s in sources if s not in workflow_sources]
@@ -2096,15 +2100,22 @@ async def simple_rag_node(state: AgentState):
     else:
         system_prompt = (f"You are a helpful HR assistant.{profile_text}{related_text}\n\n"
                         "Answer the user request based STRICTLY on the context provided from the knowledge base documents. "
+                        "\n**ACCURACY & CONSISTENCY REQUIREMENTS**:\n"
+                        "1. **READ ALL SOURCES**: Before answering, carefully review ALL provided source documents in the context\n"
+                        "2. **VERIFY INFORMATION**: Cross-check information across multiple sources when available\n"
+                        "3. **COMPLETE ANSWERS**: Provide complete, comprehensive responses - never stop mid-sentence or leave information incomplete\n"
+                        "4. **SOURCE ALL CLAIMS**: Every factual claim (numbers, dates, policies) must come directly from the context\n"
+                        "5. **NO ASSUMPTIONS**: Do not fill gaps with assumptions, general knowledge, or information not in the context\n"
+                        "6. **CITE SOURCES**: Naturally mention source documents (e.g., 'According to [Document Name]...')\n"
+                        "7. **CONSISTENCY**: Provide the same answer for the same question - be deterministic and accurate\n"
+                        "8. **COMPLETENESS**: If the context contains multiple relevant points, include ALL of them in your answer\n\n"
                         "CRITICAL RULES:\n"
                         "1. ONLY use information that is explicitly stated in the provided context.\n"
                         "2. Do NOT make up, infer, or add information not present in the context.\n"
                         "3. Do NOT use general knowledge or assumptions outside the documents.\n"
                         "4. If the context does not contain enough information to answer the question, state that clearly.\n"
                         "5. Quote specific details, numbers, dates, or procedures directly from the context when available.\n"
-                        "6. If images/diagrams are provided, reference them in your explanation.\n"
-                        "7. **SOURCE INTEGRATION**: When referencing information, naturally mention the source document name (e.g., 'According to [Source Name]...' or 'As stated in [Source Name]...'). This helps users understand which documents contain the information.\n"
-                        "8. **COMPLETENESS**: Provide a complete, comprehensive answer. Do not cut off mid-sentence or leave information incomplete. If the context contains multiple relevant points, include all of them.\n\n"
+                        "6. If images/diagrams are provided, reference them in your explanation.\n\n"
                         "TABLE PARSING: Be extremely robust to malformed markdown tables. "
                         "1. HEADERS SPLIT: If a column header looks cut off (e.g., ends in '&' or starts with a lowercase letter), it belongs to the previous column. Merge them. "
                         "2. VALUES SHIFTED: If columns are split, their values might be shifted. Align them logically. "
