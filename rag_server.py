@@ -438,6 +438,15 @@ async def search_graphiti_memory(query: str, num_results: int = 5, memory_types:
                 break
 
         logger.info(f"🧠 Graphiti search (types={memory_types or 'all'}) returned {len(facts)} facts")
+        
+        # Log actual fact content for debugging
+        if facts:
+            logger.info(f"📋 Graphiti facts retrieved ({len(facts)} facts):")
+            for i, fact in enumerate(facts[:3], 1):  # Log first 3 facts
+                fact_text = fact.get("fact", "")[:200]  # First 200 chars
+                memory_type = fact.get("memory_type", "unknown")
+                logger.info(f"  Fact {i} ({memory_type}): {fact_text}...")
+        
         return facts
     except Exception as e:
         logger.error(f"⚠️ Graphiti search error: {e}")
@@ -649,6 +658,18 @@ async def get_user_context_from_graphiti(user_id: str, num_results: int = 5) -> 
 
         logger.info(f"📋 Retrieved user context from Graphiti: profile={len(user_profile)} keys, "
                    f"conversations={len(recent_convos)}")
+        
+        # Log what profile data was extracted
+        if user_profile:
+            logger.info(f"📋 Extracted profile keys: {list(user_profile.keys())}")
+            logger.debug(f"📋 Profile data: {user_profile}")
+
+        # Log conversation facts retrieved
+        if recent_convos:
+            logger.info(f"📋 Recent conversations retrieved ({len(recent_convos)} conversations):")
+            for i, conv in enumerate(recent_convos[:2], 1):
+                conv_text = conv.get("fact", "")[:150]
+                logger.info(f"  Conversation {i}: {conv_text}...")
 
         return {
             "user_profile": user_profile,
@@ -719,6 +740,18 @@ async def search_conversation_history_graphiti(
                         conv["is_recent"] = False
 
         logger.info(f"🔍 Found {len(related_conversations)} related conversations for: {query[:50]}")
+        
+        # Log related conversations found
+        if related_conversations:
+            logger.info(f"🔍 Related conversations for '{query[:50]}' ({len(related_conversations)} found):")
+            for i, conv in enumerate(related_conversations[:2], 1):
+                conv_text = conv.get("fact", "")[:150]
+                time_ago = conv.get("time_ago_hours", "unknown")
+                if isinstance(time_ago, (int, float)):
+                    logger.info(f"  Conversation {i} ({time_ago:.1f}h ago): {conv_text}...")
+                else:
+                    logger.info(f"  Conversation {i}: {conv_text}...")
+        
         return related_conversations
 
     except Exception as e:
@@ -811,6 +844,17 @@ async def get_temporal_conversation_flow(
 
         logger.info(f"⏰ Temporal analysis: {len(timed_conversations)} conversations, "
                    f"{len(sessions)} sessions, {query_frequency:.2f} queries/hour")
+        
+        # Log temporal conversation flow details
+        if timed_conversations:
+            logger.info(f"⏰ Temporal conversation flow ({len(timed_conversations)} conversations):")
+            for i, conv in enumerate(timed_conversations[:3], 1):
+                fact_text = conv.get("fact", "")[:150]
+                hours_ago = conv.get("hours_ago", "unknown")
+                if isinstance(hours_ago, (int, float)):
+                    logger.info(f"  Conversation {i} ({hours_ago:.1f}h ago): {fact_text}...")
+                else:
+                    logger.info(f"  Conversation {i}: {fact_text}...")
 
         return {
             "conversation_flow": timed_conversations,
@@ -1597,18 +1641,19 @@ async def _retrieve_single_query(query: str, user_id: str, use_advanced_rag: boo
             )
             logger.info(f"Retrieval evaluation: {evaluation.quality.value} (relevance: {evaluation.relevance_score:.2f}, completeness: {evaluation.completeness_score:.2f})")
             
-            # Only correct if quality is poor (not fair, good, or excellent) and we haven't already corrected
-            # Skip correction for "good" or "excellent" quality - they don't need correction
-            if evaluation.quality.value == "poor" and corrective_rag.should_correct(evaluation):
-                logger.info(f"Retrieval quality is POOR - correction needed")
-            elif evaluation.quality.value in ["good", "excellent"]:
-                logger.info(f"Retrieval quality is {evaluation.quality.value.upper()} - skipping correction (no improvement needed)")
-                logger.info(f"Retrieval needs correction. Gaps: {evaluation.gaps[:2]}")  # Log only first 2
-                # Filter irrelevant content
+            # Determine if correction is actually needed based on quality and should_correct logic
+            needs_correction = corrective_rag.should_correct(evaluation)
+            
+            if needs_correction:
+                # Quality is poor or fair with low scores - correction needed
+                logger.info(f"Retrieval quality is {evaluation.quality.value.upper()} - correction needed")
+                logger.info(f"Retrieval gaps identified: {evaluation.gaps[:3]}")  # Log first 3 gaps
+                
+                # Filter irrelevant content if present
                 if evaluation.irrelevant_parts:
                     initial_context = corrective_rag.filter_irrelevant(initial_context, evaluation.irrelevant_parts)
                 
-                # Only attempt re-retrieval if quality is poor and we have refined queries
+                # Attempt re-retrieval with refined queries if available
                 if evaluation.refined_queries and len(evaluation.gaps) > 0:
                     logger.info(f"Attempting re-retrieval with refined query: {evaluation.refined_queries[0]}")
                     try:
@@ -1622,10 +1667,22 @@ async def _retrieve_single_query(query: str, user_id: str, use_advanced_rag: boo
                             additional_context = refined_result['context'][:2000]  # Limit to 2000 chars
                             initial_context = f"{initial_context}\n\n**Additional Context:**\n{additional_context}"
                             sources.extend(refined_result.get("sources", [])[:3])  # Limit to 3 additional sources
+                            logger.info(f"✅ Re-retrieval successful: added {len(additional_context)} chars of additional context")
                     except asyncio.TimeoutError:
                         logger.warning("Re-retrieval timed out, proceeding with original context")
                     except Exception as e:
                         logger.warning(f"Re-retrieval failed: {e}, proceeding with original context")
+            else:
+                # Quality is good or excellent - no correction needed
+                # Log gaps for informational purposes only (minor gaps are normal even for good quality)
+                if evaluation.gaps:
+                    logger.info(f"Retrieval quality is {evaluation.quality.value.upper()} - no correction needed (minor gaps noted: {len(evaluation.gaps)} gaps)")
+                else:
+                    logger.info(f"Retrieval quality is {evaluation.quality.value.upper()} - no correction needed")
+                
+                # Still filter irrelevant content if present (even for good quality)
+                if evaluation.irrelevant_parts:
+                    initial_context = corrective_rag.filter_irrelevant(initial_context, evaluation.irrelevant_parts)
         
         # 9. Apply contextual compression if context is too long
         if use_advanced_rag and contextual_compressor and contextual_compressor.should_compress(initial_context):
@@ -1647,7 +1704,8 @@ agent_llm = AzureChatOpenAI(
     api_version=AZURE_OPENAI_API_VERSION,
     azure_endpoint=AZURE_OPENAI_ENDPOINT,
     api_key=AZURE_OPENAI_API_KEY,
-    temperature=0
+    temperature=0,
+    max_tokens=3000  # Increased to prevent answer truncation
 )
 
 # --- State Definition ---
@@ -1674,6 +1732,14 @@ class AgentState(TypedDict):
     # Greeting detection fields
     is_greeting: Optional[bool]  # True if query is a greeting/casual message
     greeting_type: Optional[str]  # Type of greeting: 'greeting', 'casual', 'emotional', or None
+    # Optimization layer data
+    user_profile: Optional[Dict[str, Any]]  # User context (role, country, department, preferences)
+    topic_acknowledgment: Optional[str]  # Topic transition acknowledgment
+    # Conversation history and Graphiti context for personalized, context-aware responses
+    conversation_history: List[Dict[str, str]]  # Recent conversation history (last 10 messages)
+    graphiti_context: Optional[Dict[str, Any]]  # Graphiti context (user profile, related conversations, temporal flow)
+    graphiti_related_conversations: Optional[List[Dict[str, Any]]]  # Related past conversations from Graphiti
+    graphiti_temporal_flow: Optional[Dict[str, Any]]  # Temporal conversation patterns from Graphiti
 
 # --- Nodes ---
 
@@ -1723,11 +1789,13 @@ async def greeting_detection_node(state: AgentState):
     
     if llm_classifier:
         try:
-            # Get conversation history for context
-            conversation_history = []
-            if user_id:
+            # Get conversation history from state (preferred) or fallback to get_user_history
+            conversation_history = state.get("conversation_history", [])
+            if not conversation_history and user_id:
                 history = get_user_history(user_id, use_summarization=False)
                 conversation_history = history[-5:]  # Last 5 messages for context
+            else:
+                conversation_history = conversation_history[-5:]  # Last 5 messages for context
             
             # Use LLM classifier with conversation history
             result = llm_classifier.classify_query(
@@ -1750,14 +1818,16 @@ async def greeting_detection_node(state: AgentState):
             logger.warning(f"LLM classifier failed for greeting detection, using fallback: {e}")
     
     # Fallback: Use pattern matching if LLM classifier not available or fails
-    # Get conversation history for fallback too
-    conversation_history = []
-    if user_id:
+    # Get conversation history from state (preferred) or fallback to get_user_history
+    conversation_history = state.get("conversation_history", [])
+    if not conversation_history and user_id:
         try:
             history = get_user_history(user_id, use_summarization=False)
             conversation_history = history[-5:]
         except:
-            pass
+            conversation_history = []
+    else:
+        conversation_history = conversation_history[-5:] if conversation_history else []
     
     is_greeting_pattern = is_greeting_or_casual(query, conversation_history)
     if is_greeting_pattern:
@@ -1814,14 +1884,21 @@ async def greeting_response_node(state: AgentState):
         clarification_tracker.abandon_session(user_id)
         logger.info(f"Abandoned clarification session for {user_id} - greeting detected")
     
-    # Get conversation history for personalized, context-aware responses
-    conversation_history = []
-    if user_id:
+    # Get conversation history from state (preferred) or fallback to get_user_history
+    conversation_history = state.get("conversation_history", [])
+    if not conversation_history and user_id:
         try:
             history = get_user_history(user_id, use_summarization=False)
             conversation_history = history[-10:]  # Last 10 messages for context
         except Exception as e:
             logger.warning(f"Could not retrieve conversation history for greeting: {e}")
+            conversation_history = []
+    else:
+        conversation_history = conversation_history[-10:] if conversation_history else []
+    
+    # GET GRAPHITI FROM STATE for better personalization
+    graphiti_context = state.get("graphiti_context", {})
+    user_profile = graphiti_context.get("user_profile", {}) if graphiti_context else {}
     
     # Build conversation context string for LLM
     context_str = ""
@@ -1951,6 +2028,16 @@ class SimpleRAGOutput(BaseModel):
 async def simple_rag_node(state: AgentState):
     query = state["original_query"]
     user_id = state["user_id"]
+    
+    # GET HISTORY AND GRAPHITI FROM STATE for personalized responses
+    conversation_history = state.get("conversation_history", [])
+    graphiti_context = state.get("graphiti_context", {})
+    user_profile = graphiti_context.get("user_profile", {}) if graphiti_context else {}
+    related_convs = state.get("graphiti_related_conversations", [])
+    
+    # Debug logging
+    logger.info(f"📝 simple_rag_node: history={len(conversation_history)} msgs, profile={bool(user_profile)}, related_convs={len(related_convs)}")
+    
     search_result = await run_search_for_deep_agent(query, user_id)
     context = search_result["context"]
     sources = search_result["sources"]
@@ -1988,33 +2075,65 @@ async def simple_rag_node(state: AgentState):
             "clarifying_questions": ["Document type preference: workflow, policy, or both?"]
         }
     
+    # BUILD PERSONALIZED SYSTEM PROMPT with history and Graphiti context
+    profile_text = ""
+    if user_profile:
+        profile_parts = [f"{k}: {v}" for k, v in user_profile.items() if v and k not in ['preferred_format']]
+        if profile_parts:
+            profile_text = f"\n\nUser Profile: {', '.join(profile_parts)}"
+    
+    related_text = ""
+    if related_convs:
+        related_summary = "\n".join([f"- {c.get('fact', '')[:120]}..." for c in related_convs[:2]])
+        related_text = f"\n\nRelated Past Conversations:\n{related_summary}"
+    
     # Build messages with multimodal support if images are present
     if has_workflow and not has_normal:
-        system_prompt = ("You are a helpful HR assistant. The user's query matched WORKFLOW documents which contain step-by-step procedures. "
+        system_prompt = (f"You are a helpful HR assistant.{profile_text}{related_text}\n\n"
+                        "The user's query matched WORKFLOW documents which contain step-by-step procedures. "
                         "Provide a detailed, structured answer following the workflow steps. Use numbered steps where appropriate. "
                         "If images/diagrams are provided, reference them in your explanation.")
     else:
-        system_prompt = ("You are a helpful HR assistant. Answer the user request based STRICTLY on the context provided from the knowledge base documents. "
+        system_prompt = (f"You are a helpful HR assistant.{profile_text}{related_text}\n\n"
+                        "Answer the user request based STRICTLY on the context provided from the knowledge base documents. "
                         "CRITICAL RULES:\n"
                         "1. ONLY use information that is explicitly stated in the provided context.\n"
                         "2. Do NOT make up, infer, or add information not present in the context.\n"
                         "3. Do NOT use general knowledge or assumptions outside the documents.\n"
                         "4. If the context does not contain enough information to answer the question, state that clearly.\n"
                         "5. Quote specific details, numbers, dates, or procedures directly from the context when available.\n"
-                        "6. If images/diagrams are provided, reference them in your explanation.\n\n"
+                        "6. If images/diagrams are provided, reference them in your explanation.\n"
+                        "7. **SOURCE INTEGRATION**: When referencing information, naturally mention the source document name (e.g., 'According to [Source Name]...' or 'As stated in [Source Name]...'). This helps users understand which documents contain the information.\n"
+                        "8. **COMPLETENESS**: Provide a complete, comprehensive answer. Do not cut off mid-sentence or leave information incomplete. If the context contains multiple relevant points, include all of them.\n\n"
                         "TABLE PARSING: Be extremely robust to malformed markdown tables. "
                         "1. HEADERS SPLIT: If a column header looks cut off (e.g., ends in '&' or starts with a lowercase letter), it belongs to the previous column. Merge them. "
                         "2. VALUES SHIFTED: If columns are split, their values might be shifted. Align them logically. "
                         "3. COMBINED HEADERS: If a header mentions multiple entities (e.g. 'Brand A & Brand B' or 'OYSHO Pull & Bear'), the values in that column apply to ALL listed entities. "
                         "4. EXTRACT VALUES: Do not complain about formatting. Use your best judgement to reconstruct the table and return the requested value.\n\n"
-                        "**DYNAMIC CLARIFICATION**:\n"
-                        "If the retrieved context shows that the answer varies based on specific criteria (e.g., Job Position, Country, Seniority) that the user HAS NOT provided, do **not** try to list every possible option.\n"
-                        "Instead, set status to 'NEEDS_CLARIFICATION' and list the missing variables (e.g. ['Job Position']).\n"
-                        "Only set this if the answer is TRULY ambiguous without that info.")
+                        "**DIRECT ANSWERS FIRST - CLARIFICATION LAST RESORT**:\n"
+                        "CRITICAL: Always provide a DIRECT answer when possible. Only ask for clarification as an absolute last resort.\n\n"
+                        "1. **Provide Direct Answers** when:\n"
+                        "   - The context contains general information that answers the question (even if not specific to a country/position)\n"
+                        "   - You can provide a helpful answer with the available context\n"
+                        "   - The question can be answered with general policies or procedures\n"
+                        "   - Examples: 'Can my brother join?' → Answer with general recruitment policy\n"
+                        "             'What is maternity leave?' → Answer with general policy, mention it may vary by country\n\n"
+                        "2. **Only use NEEDS_CLARIFICATION** if:\n"
+                        "   - The answer is COMPLETELY IMPOSSIBLE without specific information\n"
+                        "   - The context shows the answer varies dramatically and you cannot provide ANY useful information\n"
+                        "   - You have NO general information to share\n"
+                        "   - Example: User asks 'What is my leave balance?' → Needs employee ID (impossible without it)\n\n"
+                        "3. **Default to ANSWERED** - Provide the best answer you can with available context, even if it's general.")
     
     # Multimodal inference if images are present
     messages = []
     messages.append(("system", system_prompt))
+    
+    # Add recent conversation history for context (last 3 messages)
+    if conversation_history:
+        for msg in conversation_history[-3:]:
+            if msg.get("role") in ["user", "assistant"] and msg.get("content"):
+                messages.append((msg.get("role"), msg.get("content", "")))
     
     if retrieved_images:
         # Build multimodal message with text and images
@@ -2052,16 +2171,67 @@ async def simple_rag_node(state: AgentState):
 
 # 3. Decomposer (Complex Path)
 class DecompositionOutput(BaseModel):
-    sub_queries: List[str] = Field(description="List of 2-4 sub-questions to answer the main query.")
+    needs_decomposition: bool = Field(description="Whether the query should be decomposed into sub-queries")
+    reasoning: str = Field(description="Chain of thought reasoning explaining the decomposition decision")
+    sub_queries: List[str] = Field(description="List of sub-queries. If needs_decomposition is false, contains only the original query. If true, contains 2-4 sub-queries that preserve the original intent.")
 
 async def decomposer_node(state: AgentState):
     query = state["original_query"]
+    
     prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are an expert planner. Break down the complex query into 2-4 distinct, simpler sub-queries that, when answered, will allow you to answer the main query comprehensively. Return ONLY the list of strings."),
-        ("user", "{query}")
+        ("system", """You are an expert query planner. Analyze the query and determine if it should be decomposed.
+
+CRITICAL RULES:
+1. **Preserve Original Intent**: If decomposing, each sub-query MUST maintain the original query's intent and context. Sub-queries should be focused parts of the original question, not unrelated questions.
+
+2. **Decomposition Criteria**: Only decompose if the query has MULTIPLE DISTINCT, SEPARATE questions or topics that require different retrieval strategies:
+   - Multiple independent questions (e.g., "What is X and how does Y work?")
+   - Comparison queries (e.g., "Compare X vs Y")
+   - Multiple distinct topics with clear separation
+
+3. **Do NOT Decompose** if:
+   - The query is a single unified question (even if it mentions multiple things)
+   - The query uses "and" or "or" but asks one cohesive question
+   - The query is simple and can be answered with one search
+   - The query is about one topic with multiple aspects
+
+4. **Chain of Thought**: Think step by step:
+   - Step 1: What is the core intent of the original query?
+   - Step 2: Does this query have multiple distinct, separate questions?
+   - Step 3: If yes, can each sub-question be answered independently while preserving the original intent?
+   - Step 4: If no, keep as single query to preserve the original intent.
+
+5. **If Not Decomposable**: Return needs_decomposition=false and include the original query as the only sub-query.
+
+6. **If Decomposable**: Create 2-4 sub-queries that:
+   - Each preserves the original query's intent and context
+   - Together cover all aspects of the original query
+   - Can be answered independently
+   - When combined, fully answer the original query"""),
+        ("user", "Original Query: {query}\n\nAnalyze this query using chain of thought reasoning and determine if it should be decomposed.")
     ])
+    
     chain = prompt | agent_llm.with_structured_output(DecompositionOutput)
     result = await chain.ainvoke({"query": query})
+    
+    # Log the reasoning for debugging
+    logger.info(f"🧠 Decomposition Analysis: needs_decomposition={result.needs_decomposition}, reasoning={result.reasoning[:150]}...")
+    
+    # If not decomposable, ensure we return the original query as single sub-query
+    if not result.needs_decomposition or len(result.sub_queries) == 0:
+        logger.info(f"📌 Query not decomposable or empty sub-queries - using original query as single sub-query")
+        return {"sub_queries": [query]}
+    
+    # Validate that sub-queries preserve original intent
+    if len(result.sub_queries) == 1:
+        logger.info(f"📌 Only one sub-query generated - using original query to preserve intent")
+        return {"sub_queries": [query]}
+    
+    # Log sub-queries for verification
+    logger.info(f"✅ Query decomposed into {len(result.sub_queries)} sub-queries preserving original intent")
+    for i, sub_q in enumerate(result.sub_queries, 1):
+        logger.info(f"   Sub-query {i}: {sub_q[:80]}...")
+    
     return {"sub_queries": result.sub_queries}
 
 # 4. Executor (Complex Path)
@@ -2105,16 +2275,40 @@ async def synthesizer_node(state: AgentState):
     original_query = state["original_query"]
     sub_answers = state["sub_answers"]
     
+    # GET HISTORY AND GRAPHITI FROM STATE for personalized synthesis
+    conversation_history = state.get("conversation_history", [])
+    graphiti_context = state.get("graphiti_context", {})
+    user_profile = graphiti_context.get("user_profile", {}) if graphiti_context else {}
+    related_convs = state.get("graphiti_related_conversations", [])
+    
+    # Debug logging
+    logger.info(f"📝 synthesizer_node: history={len(conversation_history)} msgs, profile={bool(user_profile)}, related_convs={len(related_convs)}")
+    
     combined_context = "\n\n".join(sub_answers)
     
+    # BUILD PERSONALIZED PROMPT
+    profile_text = ""
+    if user_profile:
+        profile_parts = [f"{k}: {v}" for k, v in user_profile.items() if v and k not in ['preferred_format']]
+        if profile_parts:
+            profile_text = f"\n\nUser Profile: {', '.join(profile_parts)}"
+    
+    related_text = ""
+    if related_convs:
+        related_summary = "\n".join([f"- {c.get('fact', '')[:100]}..." for c in related_convs[:2]])
+        related_text = f"\n\nRelated Past Conversations:\n{related_summary}"
+    
     messages = [
-        ("system", "You are a helpful HR expert. You have gathered information for a complex user request. "
+        ("system", f"You are a helpful HR expert.{profile_text}{related_text}\n\n"
+                   "You have gathered information for a complex user request. "
                    "Synthesize the provided sub-answers into a cohesive final report.\n\n"
                    "CRITICAL RULES:\n"
                    "1. ONLY use information that is explicitly stated in the provided sub-answers (which come from knowledge base documents).\n"
                    "2. Do NOT make up, infer, or add information not present in the sub-answers.\n"
                    "3. Do NOT use general knowledge or assumptions outside the documents.\n"
-                   "4. If the sub-answers do not contain enough information, state that clearly.\n\n"
+                   "4. If the sub-answers do not contain enough information, state that clearly.\n"
+                   "5. **SOURCE INTEGRATION**: When referencing information, naturally mention the source document name when relevant.\n"
+                   "6. **COMPLETENESS**: Provide a complete, comprehensive answer. Include all relevant information from the sub-answers. Do not cut off mid-sentence or leave information incomplete.\n\n"
                    "**CRITICAL INSTRUCTION**:\n"
                    "1. **Direct Answer First**: Start by directly answering the user's ORIGINAL request using the synthesized information.\n"
                    "2. **Supporting Details**: Then, provide the detailed breakdown based on the sub-queries investigating specific aspects.\n"
@@ -2122,6 +2316,13 @@ async def synthesizer_node(state: AgentState):
         ("user", f"Original Request: {original_query}\n\nGathered Information from Knowledge Base:\n{combined_context}\n\n"
                 f"Based STRICTLY on the information above, synthesize a comprehensive answer. If information is missing, say so explicitly.")
     ]
+    
+    # Add conversation history for context
+    if conversation_history:
+        for msg in conversation_history[-3:]:
+            if msg.get("role") in ["user", "assistant"] and msg.get("content"):
+                messages.insert(-1, (msg.get("role"), msg.get("content", "")))
+    
     response = await agent_llm.ainvoke(messages)
     return {"final_answer": response.content}
 
@@ -2130,11 +2331,20 @@ async def format_handler_node(state: AgentState):
     query = state["original_query"]
     previous_response = state.get("previous_response", "")
     
+    # GET GRAPHITI FROM STATE for user preferences
+    graphiti_context = state.get("graphiti_context", {})
+    user_profile = graphiti_context.get("user_profile", {}) if graphiti_context else {}
+    
     if not previous_response:
         return {"final_answer": "I don't have a previous response to reformat. Please ask a question first."}
     
+    # Check user preferences from profile
+    preferred_format = user_profile.get("preferred_format", None)  # e.g., "table", "bullet", "detailed"
+    format_hint = f"\n\nNote: User prefers {preferred_format} format." if preferred_format else ""
+    
     messages = [
-        ("system", "You are a helpful assistant. The user wants you to reformat or re-present a previous response. "
+        ("system", f"You are a helpful assistant.{format_hint}\n\n"
+                   "The user wants you to reformat or re-present a previous response. "
                    "Apply the requested formatting changes to the content provided. Keep the same information, just change how it's presented.\n\n"
                    "CRITICAL: Only reformat the information that was already in the previous response. Do NOT add new information or make up details."),
         ("user", f"Previous Response:\n{previous_response}\n\nUser Request: {query}")
@@ -2144,8 +2354,10 @@ async def format_handler_node(state: AgentState):
 
 # 7. Clarifier Node (GENERIC Path - Ask clarifying questions based on RAG data)
 class ClarificationOutput(BaseModel):
-    questions: List[str] = Field(description="List of 2-4 clarifying questions to ask the user")
-    categories_found: List[str] = Field(description="Categories/options found in the knowledge base")
+    can_answer_directly: bool = Field(description="Whether a direct answer can be provided with available context")
+    direct_answer: str = Field(description="Direct answer if can_answer_directly is true, otherwise empty", default="")
+    questions: List[str] = Field(description="List of 2-4 clarifying questions if can_answer_directly is false", default_factory=list)
+    categories_found: List[str] = Field(description="Categories/options found in the knowledge base", default_factory=list)
 
 async def clarifier_node(state: AgentState):
     """
@@ -2308,6 +2520,15 @@ async def clarifier_node(state: AgentState):
         }
     
     # No existing session - create new one (FIRST TIME ONLY)
+    # GET HISTORY AND GRAPHITI FROM STATE for personalized clarification questions
+    conversation_history = state.get("conversation_history", [])
+    graphiti_context = state.get("graphiti_context", {})
+    user_profile = graphiti_context.get("user_profile", {}) if graphiti_context else {}
+    related_convs = state.get("graphiti_related_conversations", [])
+    
+    # Debug logging
+    logger.info(f"📝 clarifier_node: history={len(conversation_history)} msgs, profile={bool(user_profile)}, related_convs={len(related_convs)}")
+    
     # Check if we already have context (passed from simple_rag_node fallback)
     context = state.get("rag_context_for_clarification")
     sources = state.get("sources", [])
@@ -2318,28 +2539,76 @@ async def clarifier_node(state: AgentState):
         context = search_result["context"]
         sources = search_result["sources"]
     
-    # Generate clarifying questions based on what's in the data (ONCE)
+    # BUILD PERSONALIZED CLARIFICATION PROMPT
+    profile_hint = ""
+    if user_profile:
+        # Use profile to ask better questions
+        if user_profile.get("country"):
+            profile_hint = f"\n\nNote: User is from {user_profile.get('country')}, consider this in questions."
+        if user_profile.get("role"):
+            profile_hint += f"\nNote: User role is {user_profile.get('role')}, tailor questions accordingly."
+    
+    related_hint = ""
+    if related_convs:
+        related_hint = "\n\nConsider what user has asked before when generating questions."
+    
+    # Generate response - try direct answer first, only clarify if impossible
     prompt = ChatPromptTemplate.from_messages([
-        ("system", """You are an HR assistant helping to clarify a user's generic question.
+        ("system", f"""You are a helpful HR assistant.{profile_hint}{related_hint}
 
-Based on the retrieved context from our knowledge base, generate 2-4 targeted clarifying questions.
+CRITICAL PRIORITY: Provide DIRECT answers whenever possible. Only ask for clarification as a last resort.
 
-IMPORTANT RULES:
-1. Questions should be based on ACTUAL OPTIONS/CATEGORIES found in the context
-2. Questions should help narrow down exactly what the user needs
-3. Format questions as a numbered list
-4. Be specific - use real category names from the context (e.g., "health insurance", "life insurance", "dental")
-5. Keep questions concise and clear
-6. Ask questions in a logical order (e.g., country first, then position, then specific details)
+DECISION LOGIC:
+1. **Can Answer Directly?** Check if the context contains information that answers the question (even if general)
+   - Examples that CAN be answered directly:
+     * "Can my brother join?" → Answer with general recruitment policy
+     * "What is maternity leave?" → Answer with general policy, mention variations
+     * "How do I apply?" → Answer with general application process
+   
+2. **Cannot Answer?** Only if the context has NO relevant information AND the question requires specific data you don't have
+   - Example that NEEDS clarification:
+     * "What is my leave balance?" → Needs employee ID (impossible without it)
 
-Example: If user asks "How can I benefit from insurance?" and context mentions health, life, and dental insurance:
-- What type of insurance are you interested in: health insurance, life insurance, or dental insurance?
-- Are you asking about coverage limits, enrollment process, or claim procedures?"""),
-        ("user", f"User's generic question: {query}\n\nAvailable context from knowledge base:\n{context}\n\nGenerate clarifying questions:")
+RULES FOR DIRECT ANSWERS:
+- Use general information from context even if not specific to user's situation
+- Mention that details may vary by country/position if applicable
+- Be helpful and informative
+- Provide actionable information
+
+RULES FOR CLARIFICATION (only if truly needed):
+- Questions should be based on ACTUAL OPTIONS/CATEGORIES found in the context
+- Ask 2-3 targeted questions maximum
+- Be specific - use real category names from the context
+- Keep questions concise and clear"""),
+        ("user", f"User's question: {query}\n\nAvailable context from knowledge base:\n{context}\n\nDecide: Can you provide a direct answer? If yes, provide it. If no, explain why and ask 2-3 clarifying questions.")
     ])
     
     chain = prompt | agent_llm.with_structured_output(ClarificationOutput)
     result = await chain.ainvoke({"query": query, "context": context})
+    
+    # Check if we can answer directly
+    if result.can_answer_directly and result.direct_answer:
+        logger.info(f"✅ Provided direct answer without clarification for: {query[:50]}")
+        return {
+            "final_answer": result.direct_answer,
+            "sources": sources,
+            "awaiting_clarification": False
+        }
+    
+    # Need clarification - create session
+    if not result.questions or len(result.questions) == 0:
+        # Fallback: if no questions generated, try to answer directly anyway
+        logger.warning(f"No clarification questions generated, attempting direct answer")
+        messages = [
+            ("system", "You are a helpful HR assistant. Answer the user's question based on the context provided."),
+            ("user", f"Question: {query}\n\nContext:\n{context}\n\nProvide a helpful answer.")
+        ]
+        response = await agent_llm.ainvoke(messages)
+        return {
+            "final_answer": response.content,
+            "sources": sources,
+            "awaiting_clarification": False
+        }
     
     # Create clarification session to track this (ONCE - questions are fixed now)
     session = clarification_tracker.create_session(
@@ -2376,6 +2645,11 @@ async def clarification_answer_handler_node(state: AgentState):
     """
     query = state["original_query"]
     user_id = state["user_id"]
+    
+    # GET HISTORY AND GRAPHITI FROM STATE for personalized answers
+    conversation_history = state.get("conversation_history", [])
+    graphiti_context = state.get("graphiti_context", {})
+    user_profile = graphiti_context.get("user_profile", {}) if graphiti_context else {}
     
     # Get active clarification session
     session = clarification_tracker.get_active_session(user_id)
@@ -2440,8 +2714,17 @@ async def clarification_answer_handler_node(state: AgentState):
         
         # Generate answer - emphasize original question and intent
         original_question = session.original_query
+        
+        # BUILD PERSONALIZED PROMPT with Graphiti context
+        profile_context = ""
+        if user_profile:
+            profile_parts = [f"{k}: {v}" for k, v in user_profile.items() if v and k not in ['preferred_format']]
+            if profile_parts:
+                profile_context = f"\n\nUser Profile: {', '.join(profile_parts)}"
+        
         messages = [
-            ("system", f"You are a helpful HR assistant. Answer the user's ORIGINAL question based STRICTLY on the context provided from the knowledge base documents. "
+            ("system", f"You are a helpful HR assistant.{profile_context}\n\n"
+                      f"Answer the user's ORIGINAL question based STRICTLY on the context provided from the knowledge base documents. "
                       f"CRITICAL RULES:\n"
                       f"1. The user's ORIGINAL question is: \"{original_question}\" - THIS IS THE MAIN QUESTION TO ANSWER.\n"
                       f"2. The user provided clarification answers to help narrow down the question, but the ORIGINAL question remains the focus.\n"
@@ -2591,7 +2874,9 @@ async def doc_preference_handler_node(state: AgentState):
                   "2. Do NOT make up, infer, or add information not present in the context.\n"
                   "3. Do NOT use general knowledge or assumptions outside the documents.\n"
                   "4. If the context does not contain enough information to answer the question, state that clearly.\n"
-                  "5. Quote specific details, numbers, dates, or procedures directly from the context when available."),
+                  "5. Quote specific details, numbers, dates, or procedures directly from the context when available.\n"
+                  "6. **SOURCE INTEGRATION**: When referencing information, naturally mention the source document name (e.g., 'According to [Source Name]...' or 'As stated in [Source Name]...').\n"
+                  "7. **COMPLETENESS**: Provide a complete, comprehensive answer. Include all relevant information from the context. Do not cut off mid-sentence or leave information incomplete."),
         ("user", f"Context from Knowledge Base:\n{context}\n\n"
                 f"Question: {original_user_query}\n\n"
                 f"Based STRICTLY on the context above, provide an answer. If the context does not contain sufficient information, say so explicitly.")
@@ -3000,10 +3285,14 @@ Evaluate if this answer properly addresses the original question using the clari
     
     # IMPORTANT: Only refine if the query is a greeting/casual message
     # For actual HR queries that need clarification, preserve the clarifying questions
-    # Get conversation history for context-aware detection
+    # Get conversation history from state (preferred) or fallback to get_user_history
     user_id = state.get("user_id", "default_user")
-    history = get_user_history(user_id, use_summarization=False)
-    conversation_history = history[-5:] if history else []
+    conversation_history = state.get("conversation_history", [])
+    if not conversation_history:
+        history = get_user_history(user_id, use_summarization=False)
+        conversation_history = history[-5:] if history else []
+    else:
+        conversation_history = conversation_history[-5:]
     
     if not is_greeting_or_casual(original_query, conversation_history):
         # This is an actual HR query - don't interfere with clarification
@@ -3103,7 +3392,9 @@ async def doc_preference_handler_node(state: AgentState):
                   "2. Do NOT make up, infer, or add information not present in the context.\n"
                   "3. Do NOT use general knowledge or assumptions outside the documents.\n"
                   "4. If the context does not contain enough information to answer the question, state that clearly.\n"
-                  "5. Quote specific details, numbers, dates, or procedures directly from the context when available."),
+                  "5. Quote specific details, numbers, dates, or procedures directly from the context when available.\n"
+                  "6. **SOURCE INTEGRATION**: When referencing information, naturally mention the source document name (e.g., 'According to [Source Name]...' or 'As stated in [Source Name]...').\n"
+                  "7. **COMPLETENESS**: Provide a complete, comprehensive answer. Include all relevant information from the context. Do not cut off mid-sentence or leave information incomplete."),
         ("user", f"Context from Knowledge Base:\n{context}\n\n"
                 f"Question: {original_user_query}\n\n"
                 f"Based STRICTLY on the context above, provide an answer. If the context does not contain sufficient information, say so explicitly.")
@@ -3426,7 +3717,8 @@ async def query_endpoint(request: QueryRequest):
             # Optimization layer data
             "user_profile": user_profile,  # Pass user context to RAG system
             "topic_acknowledgment": topic_acknowledgment,  # Topic transition acknowledgment
-            # BEST PRACTICE: Include Graphiti context for enhanced understanding
+            # BEST PRACTICE: Include conversation history and Graphiti context for enhanced understanding
+            "conversation_history": history[-10:] if history else [],  # Last 10 messages for context
             "graphiti_context": graphiti_context,
             "graphiti_related_conversations": graphiti_context.get('related_conversations', []),
             "graphiti_temporal_flow": graphiti_context.get('temporal_flow', {})
@@ -4017,7 +4309,8 @@ async def query_stream_endpoint(request: QueryRequest):
                 "greeting_type": None,
                 "user_profile": user_profile,
                 "topic_acknowledgment": topic_acknowledgment,
-                # BEST PRACTICE: Include Graphiti context for enhanced understanding
+                # BEST PRACTICE: Include conversation history and Graphiti context for enhanced understanding
+                "conversation_history": history[-10:] if history else [],  # Last 10 messages for context
                 "graphiti_context": graphiti_context,
                 "graphiti_related_conversations": graphiti_context.get('related_conversations', []),
                 "graphiti_temporal_flow": graphiti_context.get('temporal_flow', {})
