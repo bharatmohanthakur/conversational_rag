@@ -1079,28 +1079,21 @@ def rewrite_query_with_history(history: List[Dict[str, str]], latest_query: str,
 
     prompt = f"""You are an AI assistant. Your task is to rewrite the latest user question into a standalone question.
 {original_context}
-🚨 **CRITICAL RULES - PREVENT TOPIC DRIFT**:
-1. **PRESERVE USER'S ACTUAL QUESTION**: If the latest user input is a complete, clear question on its own, DO NOT change its topic or intent. Only add context if pronouns/references need resolution.
-2. **DETECT NEW TOPICS**: If the latest query introduces a NEW topic different from history (e.g., user asks about "warnings" after discussing "relocation"), DO NOT force-merge topics. Keep the new topic intact.
-3. **FORMAT REQUESTS ARE STANDALONE**: If latest query is "give me as table" / "provide as points" / "list them", keep it as-is - it's a format request, NOT a new HR question.
-4. **Preserve Original Intent**: If there is an original question provided above, ALWAYS maintain its core intent. The latest query is likely a follow-up or clarification answer related to this original question.
-5. **Ignore Greetings**: Do NOT include greetings (hi, hello, thanks) in the rewritten query. Only use actual HR questions.
-6. **Handle Clarification Answers**: If the user is answering a clarifying question, combine their answer with the ORIGINAL QUESTION (not just the immediate clarification).
-7. **Maintain Core Topic**: If the user asks a follow-up (e.g., "What about..."), apply it to the ORIGINAL QUESTION's topic ONLY if it's the same topic.
-8. **Resolve Pronouns**: Resolve 'it', 'they', 'that' to their referents from the ORIGINAL QUESTION.
-9. **Do Not Hallucinate**: Only use info present in the history.
-
-**EXAMPLES OF WHAT NOT TO DO**:
-- User asks "when the warning will be expired" → DO NOT rewrite to "when will relocation allowance be paid" even if previous topic was relocation
-- User asks "how many days for Egyptian labor law" → DO NOT rewrite to "how many remote work days" even if previous topic was remote work
-- User asks "provide as points" → DO NOT rewrite to "provide leave policy as points" unless previous answer was about leaves
+**RULES**:
+1. **Preserve User's Question**: If the latest input is a complete question, keep its core topic and intent intact.
+2. **Add Context Only When Needed**: Only add context from history to resolve pronouns (it, they, that) or ambiguous references.
+3. **Format Requests**: If latest query is "give me as table" / "provide as points", keep it as-is - it's a format request.
+4. **Clarification Answers**: If user is answering a clarification question, combine their answer with the ORIGINAL QUESTION.
+5. **Ignore Greetings**: Do NOT include greetings (hi, hello, thanks) in the rewritten query.
+6. **Do Not Force-Merge Topics**: If the user switches to a NEW topic, respect that - don't force-merge with previous topics.
+7. **Do Not Hallucinate**: Only use info from the provided history.
 
 Conversation History (greetings filtered out):
 {history_str}
 
 Latest User Input: {latest_query}
 
-Standalone Question (maintaining original intent and topic):"""
+Standalone Question:"""
 
     try:
         response = aoai_client.chat.completions.create(
@@ -2113,8 +2106,8 @@ async def simple_rag_node(state: AgentState):
     # FIX: REMOVED DEFLECTION BEHAVIOR (fixes ~40% of failures)
     # Previously asked "which type would you prefer?" instead of answering
     # Now we just continue and answer with ALL available information
-    # The prompts below will handle combining workflow + policy information appropriately
-    
+    # The prompts below explicitly forbid deflection and require combining all sources
+
     # BUILD PERSONALIZED SYSTEM PROMPT with history and Graphiti context
     profile_text = ""
     if user_profile:
@@ -2137,6 +2130,12 @@ async def simple_rag_node(state: AgentState):
                         "If images/diagrams are provided, reference them in your explanation.")
     else:
         system_prompt = (f"You are a helpful HR assistant.{profile_text}{related_text}\n\n"
+                        "🚫 **CRITICAL - NEVER ASK WHICH TYPE** (fixes deflection behavior):\n"
+                        "❌ NEVER ask: 'Would you prefer workflow or policy documents?'\n"
+                        "❌ NEVER ask: 'Which type would you prefer?'\n"
+                        "❌ NEVER ask: 'Would you like the detailed workflow or broader policies?'\n"
+                        "✅ ALWAYS: Combine ALL available information from workflow + policy + guideline documents and provide ONE comprehensive answer\n"
+                        "✅ ALWAYS: Extract and present the actual content, not just document names\n\n"
                         "🎯 **PRIMARY RULE - NEVER FORGET**: When answering, ALWAYS include EXACT numbers, amounts, percentages, dates, and timeframes from the context. Use '50 days' NOT 'several weeks', use '25%' NOT 'about a quarter'. This is THE MOST IMPORTANT REQUIREMENT.\n\n"
                         "⛔ **BEFORE YOU ANSWER - CHECK THIS**: If the context doesn't contain the exact information requested (e.g., user asks 'Bershka shop manager allowance' but context only has 'Bershka employee allowance'), you MUST say 'I cannot find information about [specific request] in the available documents' - DO NOT make assumptions or provide data for similar but different roles/categories.\n\n"
                         "Answer the user request based STRICTLY on the context provided from the knowledge base documents. "
@@ -2187,14 +2186,22 @@ async def simple_rag_node(state: AgentState):
                         "2. VALUES SHIFTED: If columns are split, their values might be shifted. Align them logically. "
                         "3. COMBINED HEADERS: If a header mentions multiple entities (e.g. 'Brand A & Brand B' or 'OYSHO Pull & Bear'), the values in that column apply to ALL listed entities. "
                         "4. EXTRACT VALUES: Do not complain about formatting. Use your best judgement to reconstruct the table and return the requested value.\n\n"
-                        "📄 **EXTRACT CONTENT, NOT JUST DOCUMENT NAMES** (fixes 4.5-5.5/10.0 failures):\n"
-                        "❌ **WRONG**: User asks 'what inputs do I need for financial reporting?' → Answer: 'Check document ACC-123.pdf'\n"
-                        "✅ **CORRECT**: User asks 'what inputs do I need for financial reporting?' → Answer: 'You need: 1) Trial balance, 2) GL entries, 3) Supporting schedules... (from document ACC-123.pdf)'\n"
-                        "\n"
-                        "**RULES**:\n"
-                        "1. **EXTRACT ACTUAL INFORMATION**: When user asks 'what inputs/requirements/steps/controls', extract and list the ACTUAL items from the context, don't just say 'refer to document X'\n"
-                        "2. **CONTENT OVER REFERENCES**: Provide the specific content (inputs, steps, requirements) first, then mention source document as reference\n"
-                        "3. **ACTIONABLE ANSWERS**: User wants to know WHAT to do, not WHERE to look - give them the actual list/steps\n\n"
+                        "📄 **EXTRACT CONTENT, NOT JUST DOCUMENT NAMES** (CRITICAL - fixes 4.5-5.5/10.0 failures):\n"
+                        "This is a CRITICAL requirement. When users ask 'what inputs/requirements/steps/controls/stakeholders', they want the ACTUAL LIST, not document references.\n\n"
+                        "❌ **WRONG EXAMPLES**:\n"
+                        "- User: 'what inputs for financial reporting?' → You: 'Check ACC-123.pdf' ❌\n"
+                        "- User: 'list controls in workflow' → You: 'Available in workflow document ACC-REP-005' ❌\n"
+                        "- User: 'who are stakeholders?' → You: 'Workflow documents have this info. Would you prefer workflow or policy?' ❌\n\n"
+                        "✅ **CORRECT EXAMPLES**:\n"
+                        "- User: 'what inputs for financial reporting?' → You: 'Required inputs: 1) Trial balance, 2) GL entries, 3) Supporting schedules, 4) Bank reconciliations (from ACC-123.pdf)' ✅\n"
+                        "- User: 'list controls in workflow' → You: 'Controls: 1) Verify data completeness, 2) Review account balances, 3) Obtain approvals (from ACC-REP-005)' ✅\n"
+                        "- User: 'who are stakeholders?' → You: 'Stakeholders: 1) Finance Manager, 2) Accounting Team, 3) Treasury Department, 4) Audit (from workflow document)' ✅\n\n"
+                        "**RULES** (MUST FOLLOW):\n"
+                        "1. **EXTRACT THE LIST**: When asked for inputs/steps/controls/requirements/stakeholders, extract and list the ACTUAL items from context\n"
+                        "2. **NEVER DEFLECT**: Do NOT ask 'would you prefer workflow or policy' - just combine all info and answer\n"
+                        "3. **CONTENT FIRST**: Provide the actual content (list/steps), then cite source document\n"
+                        "4. **BE SPECIFIC**: Extract the specific items, don't give vague descriptions\n"
+                        "5. **ACTIONABLE**: User wants to know WHAT, not WHERE to look\n\n"
                         "**DIRECT ANSWERS FIRST - CLARIFICATION LAST RESORT**:\n"
                         "CRITICAL: Always provide a DIRECT answer when possible. Only ask for clarification as an absolute last resort.\n\n"
                         "1. **Provide Direct Answers** when:\n"
