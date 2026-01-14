@@ -1,0 +1,32 @@
+{
+  "timestamp": "20260114_035701",
+  "stats": {
+    "total": 3,
+    "passed": 1,
+    "failed": 2,
+    "errors": 0,
+    "avg_accuracy": 6.666666666666667,
+    "avg_response_time": 49.333503564198814
+  },
+  "total_questions": 3,
+  "categories": {
+    "Recruitment": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avg_accuracy": 7.5
+    },
+    "EMPLOYEE RELOCATION": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 6.0
+    },
+    "Disciplinary actions": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 6.5
+    }
+  }
+}

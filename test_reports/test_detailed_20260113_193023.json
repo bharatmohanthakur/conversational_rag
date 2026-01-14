@@ -1,0 +1,164 @@
+{
+  "timestamp": "20260113_193023",
+  "stats": {
+    "total": 5,
+    "passed": 0,
+    "failed": 0,
+    "errors": 0,
+    "avg_accuracy": 0.0,
+    "avg_response_time": 33.395865297317506
+  },
+  "results": [
+    {
+      "question": {
+        "category": "Inurance",
+        "question": "does my insurance covers me outside my residence country?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 2
+      },
+      "actual_answer": "<p>I see you've switched from questions about leave to insurance coverage. How can I assist you with your insurance inquiry?</p>\n<p>Great question! I'd be happy to help clarify this for you. Your insurance covers you while you're outside your country of residence, but only if you're traveling for business purposes. For these work-related trips, the company provides travel medical insurance. However, if you're traveling for personal reasons, your insurance won't offer coverage outside your home country. Since policy details can sometimes vary, I'd recommend double-checking your specific plan or reaching out to HR if you need more details. If you have any other questions about your benefits or upcoming travel, just let me know—I'm here to help!</p>\n<hr />\n<p>📊 <strong>Confidence:</strong> MEDIUM (70%)\n📚 <strong>Sources:</strong> TRD - 023 - Travel Insurance - B - 3, TRV - 001 - Business Travel - B - 14, FNB - ADM - 001 - Accommodation Contract  Rules - F - 1\n⚠️ <strong>Note:</strong> The answer assumes you are asking about company-provided insurance and only addresses business travel. If you are asking about other types of insurance or personal travel, coverage may differ. Alwa...</p>\n",
+      "response_time": 31.80245614051819,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "FNB - ADM - 001 - Accommodation Contract  Rules - F - 1.md",
+        "HRD - TRD - 023 - Travel Insurance - B - 3.md",
+        "HRD - TRD - 023 - Travel Insurance - B - 3.md",
+        "HRD - TRD - 023 - Travel Insurance - B - 3.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "maternity Leave",
+        "question": "can i extend my metirnaty leave ?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 3
+      },
+      "actual_answer": "<p>I see you've switched topics from insurance to maternity leave. How can I assist you with your maternity leave extension?</p>\n<p>Absolutely, that's a great question! You can request an extension to your maternity leave, and I'm happy to guide you through the process.</p>\n<p>To extend your maternity leave, you'll need to reach out to your Line Manager and get their approval first. This step is very important—if you don't have their approval, it could be considered an unauthorized absence, which might lead to disciplinary action, according to the company’s policy (HRD - GEN - 004 - Maternity and Paternity Leaves - P - <a href=\"http://13.md\">13.md</a>).</p>\n<p>There are a few options for extending your leave:</p>\n<ul>\n<li>You can use any accumulated annual leave days.</li>\n<li>You may ask for unpaid leave.</li>\n<li>If you have a valid medical certificate, you can also request sick leave to extend your maternity leave.</li>\n</ul>\n<p>Just a quick note: Any changes or cancellations to your leave also need your Line Manager’s approval.</p>\n<p>In summary, here’s what you’ll need to do:</p>\n<ol>\n<li>Contact your Line Manager to discuss your extension and get approval.</li>\n<li>Decide if you want to use annual leave, unpaid leave, or sick leave (with a medical report) for your extension.</li>\n<li>Wait for your Line Manager’s response before making any arrangements.</li>\n</ol>\n<p>All the details are outlined in the HRD - GEN - 004 - Maternity and Paternity Leaves - P - <a href=\"http://13.md\">13.md</a> document. If you’re unsure about the forms or have any questions, your HR department will be happy to help.</p>\n<p>Let me know if you’d like more information about related topics, like other types of leave or benefits you might be eligible for. I’m here if you need anything else!</p>\n<hr />\n<p>📊 <strong>Confidence:</strong> HIGH (95%)\n📚 <strong>Sources:</strong> GEN - 004 - Maternity and Paternity Leaves - P - 13</p>\n",
+      "response_time": 42.062946796417236,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "Remote working",
+        "question": "how can i submit my remote working leave",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 4
+      },
+      "actual_answer": "<p>You've shifted from general leave topics to specifically asking about remote working leave submission.</p>\n<p>Now that we're focusing on remote working leave, I'd be happy to guide you through the submission process. To request remote working leave in the Oracle Applications system, please follow these steps:</p>\n<ol>\n<li>Log in to Oracle Applications and go to the main employee screen.</li>\n<li>Click on the &quot;View&quot; menu, then select &quot;Requests&quot; from the dropdown.</li>\n<li>In the &quot;Find Requests&quot; window, choose &quot;Submit a New Request...&quot;</li>\n<li>Enter all required details for your remote working leave, including the absence type (Remote Working), your start and end dates, and any other necessary information.</li>\n<li>Once you've completed the form, submit your request.</li>\n</ol>\n<p>After you submit, your request will be routed to your line manager for approval. They'll be notified through the HRMS system, as outlined in [HRD - TRD - 020 - Employee Attendance Validation - G - <a href=\"http://1.md\">1.md</a>].</p>\n<p>Just so you know, this process applies to all Back-office Employees, as stated in [HRD - GEN - 016 - Remote Working - P - <a href=\"http://2.md\">2.md</a>].</p>\n<p>If you have any questions about the steps or need help with the Oracle system, please let me know—I'm here to assist you!</p>\n<hr />\n<p>📊 <strong>Confidence:</strong> MEDIUM (70%)\n📚 <strong>Sources:</strong> TRD - 020 - Employee Attendance Validation - G - 1, GEN - 016 - Remote Working - P - 2\n⚠️ <strong>Note:</strong> The answer assumes you are a back-office employee with access to Oracle Applications. If your interface or process differs, consult your HR department or internal documentation.</p>\n",
+      "response_time": 33.40133094787598,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 020 - Employee Attendance Validation - G - 1.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - TRD - 020 - Employee Attendance Validation - G - 1.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "Road and Promotion",
+        "question": "what is road and when am i eligable for it",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 5
+      },
+      "actual_answer": "<p>I see you've shifted from discussing leave policies to asking about 'road' and your eligibility for it.</p>\n<p>Great question! 'Remote working leave' is a benefit that allows eligible back-office employees to work from a location outside the office, rather than using regular annual leave, in certain situations.</p>\n<p>You may be eligible for remote working leave if your role doesn't require you to be physically present at the workplace and you meet one of these conditions:</p>\n<ul>\n<li>You or a direct family member is ill or has medical needs</li>\n<li>You have an emergency that requires travel outside your base country</li>\n<li>You're unable to deliver or attend online training sessions in the office</li>\n<li>You're working during your annual leave</li>\n<li>Or, there's another significant reason approved by management</li>\n</ul>\n<p>Eligible employees can use up to 30 cumulative days of remote working leave per year. This policy is designed to support all back-office employees.</p>\n<p>If you'd like to learn more or submit a request, you can review the official policy or apply through the HRMS system. If you have any specific circumstances or need help with the application process, please let me know—I'm here to help!</p>\n<hr />\n<p>📊 <strong>Confidence:</strong> MEDIUM (60%)\n📚 <strong>Sources:</strong> GEN - 016 - Remote Working - P - 2\n⚠️ <strong>Note:</strong> The answer assumes 'road' means 'remote working leave' without clarification. If 'road' refers to something else, the answer may not be relevant. Additionally, the answer does not specify when you ...</p>\n",
+      "response_time": 29.242878675460815,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "Comission",
+        "question": "how to calculate my commision",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 6
+      },
+      "actual_answer": "<p>I see you've switched topics to commission calculation. Let me help you with that.</p>\n<p>Great question! I'd be happy to help you understand how your commission is calculated at AZADEA. Typically, store employees earn commission as a percentage of the revenue they generate. The exact percentage and calculation details can vary depending on your position, store, or even your country. To get the most accurate information for your role, I recommend checking your employment contract or reaching out directly to your HR department—they'll be able to provide the specific figures that apply to you. If you have any other questions about your compensation or policies, feel free to ask—I'm here to help!</p>\n<hr />\n<p>📊 <strong>Confidence:</strong> MEDIUM (60%)\n📚 <strong>Sources:</strong> TRD - 006 - Commission Scheme for Store Employees - P - 6, TRD - 012 - Employee Relocation - P - 16\n⚠️ <strong>Note:</strong> The answer does not provide the specific commission percentage or calculation method. For precise details, you must refer to your employment contract or contact HR.</p>\n",
+      "response_time": 30.469713926315308,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    }
+  ]
+}

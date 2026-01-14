@@ -1,0 +1,306 @@
+{
+  "timestamp": "20260113_194243",
+  "stats": {
+    "total": 10,
+    "passed": 0,
+    "failed": 2,
+    "errors": 0,
+    "avg_accuracy": 5.0,
+    "avg_response_time": 32.018701219558714
+  },
+  "results": [
+    {
+      "question": {
+        "category": "Inurance",
+        "question": "does my insurance covers me outside my residence country?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 2
+      },
+      "actual_answer": "You've switched to asking about insurance coverage outside your residence country. Let me help with that. Great question! Your insurance does provide coverage when you're outside your residence country, but only if you're traveling for business purposes. If you're on a personal trip, unfortunately, the insurance won't apply. The coverage is specifically for emergency medical situations that might come up during business travel. If you'd like more details about what's included or how to file a claim while abroad, just let me know—I'm here to help! 📊 Confidence: MEDIUM (60%) 📚 Sources: TRD - 023 - Travel Insurance - B - 3, TRV - 001 - Business Travel - B - 14, FNB - ADM - 001 - Accommodation Contract Rules - F - 1 ⚠️ Note: The answer does not specify what qualifies as 'business purposes' or whether other types of coverage (besides emergency medical) apply. It also does not integrate sources into the answer text, and ...",
+      "response_time": 27.938605546951294,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 023 - Travel Insurance - B - 3.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "FNB - ADM - 001 - Accommodation Contract  Rules - F - 1.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "maternity Leave",
+        "question": "can i extend my metirnaty leave ?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 3
+      },
+      "actual_answer": "I see you've switched topics to maternity leave. How can I assist you with extending your leave? That's a great question, and I'd be happy to assist you. At AZADEA, it's possible to extend your maternity leave, but you'll need approval from your Line Manager first. You can request to use your accumulated annual leave, apply for unpaid leave, or use sick leave if you have a valid medical certificate. Just make sure to follow the official approval process—this helps avoid any issues later on. If you'd like, I can guide you through the steps or help with any forms you might need. Let me know how you'd like to proceed! 📊 Confidence: MEDIUM (70%) 📚 Sources: GEN - 004 - Maternity and Paternity Leaves - P - 13 ⚠️ Note: The answer provides general guidance but lacks specific details from the cited policy and does not clarify if extensions are guaranteed or subject to company discretion. Please consult your HR depa...",
+      "response_time": 30.981391668319702,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "Remote working",
+        "question": "how can i submit my remote working leave",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 4
+      },
+      "actual_answer": "You've shifted from general leave topics to specifically asking about remote working leave submission. Now shifting to your question about remote working leave—I'd be happy to guide you through the process. To submit a remote working leave request at AZADEA, you'll need to use Oracle Applications. Here’s how you can do it: Log in to Oracle Applications. Go to the &quot;People&quot; section. From the &quot;View&quot; menu, select &quot;Requests.&quot; In the &quot;Find Requests&quot; window, click on &quot;Submit a New Request.&quot; Enter all the required details for your remote working leave, such as the dates and the type of leave. Once you've completed the form, submit your request for approval. This process applies to all Back-office Employees, as outlined in the HRD - GEN - 016 - Remote Working policy. Once submitted, your request will be sent to your manager for approval, as shown in the leave request table from HRD - TRD - 020. If you have any questions about the steps or if you'd like to check the status of your request, just let me know—I'm here to help! 📊 Confidence: MEDIUM (70%) 📚 Sources: GEN - 016 - Remote Working - P - 2, TRD - 020 - Employee Attendance Validation - G - 1 ⚠️ Note: The answer assumes you are a back-office employee and have access to Oracle Applications. If you are not, or do not have access, the process may differ. Please consult your HR department for furthe...",
+      "response_time": 39.04230713844299,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - TRD - 020 - Employee Attendance Validation - G - 1.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "Road and Promotion",
+        "question": "what is road and when am i eligable for it",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 5
+      },
+      "actual_answer": "I see you've shifted from discussing leave policies to asking about 'road' and your eligibility for it. Great question! Remote working leave is designed to support back-office employees who need to work from outside the office for various reasons. You may be eligible for this type of leave if your job can be performed remotely and you meet certain criteria, such as illness (for yourself or a direct family member), urgent medical concerns, emergency travel outside your base country, or if you're unable to attend or deliver online training on-site. It's also available for working during annual leaves or other significant personal reasons. Eligible employees can use up to 30 cumulative days of remote working leave per year, but please remember that manager approval is required. The policy applies to all back-office staff, though details might vary, so I recommend checking with your HR department to confirm your specific eligibility. If you have any other questions or need help with the application process, I'm here to assist! ⚠️ Confidence: LOW (20%) 📚 Sources: GEN - 016 - Remote Working - P - 2 📋 Missing Information: Definition of 'road' (the user asked about 'road', not 'remote working leave'), Eligibility criteria for 'road' (not remote working leave), Clarifi... 💡 Tip: Consider contacting HR for verification or requesting more specific information",
+      "response_time": 28.14933156967163,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "Comission",
+        "question": "how to calculate my commision",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 6
+      },
+      "actual_answer": "I see you've switched topics to commission calculation. Let me help you with that. Great question! I'd be happy to help you understand how your commission is calculated at AZADEA. For store employees, your commission is usually a percentage of the total sales revenue you generate each month. To figure out your commission, just multiply your monthly sales revenue by the commission rate set for your position or store. For example, if your sales for the month are $10,000 and your commission rate is 2%, your commission would be $200 ($10,000 x 2%). Keep in mind, commission rates can vary depending on your store, role, or even your country. If you're unsure about your specific rate, I recommend reaching out to your HR department or your store manager for clarification. If you need help finding your sales figures or commission percentage, just let me know—I'm here to assist! 📊 Confidence: HIGH (90%) 📚 Sources: TRD - 006 - Commission Scheme for Store Employees - P - 6, FNB - STR - 003 - Cash Operating Manual - FNB Outlets - G - 5, SALES - OFF - 001 - Offline Sales Validation - G - 2, TRD - 003 - Employee Discounts - P - 27 ⚠️ Note: The answer provides a general method for calculating commission but does not specify your exact commission percentage or any special rules that may apply to your role, store, or country. Please con...",
+      "response_time": 30.72324800491333,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "SALES - OFF - 001 - Offline Sales Validation - G - 2.md",
+        "HRD - TRD - 003 - Employee Discounts - P - 27.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "FNB - STR - 003 - Cash Operating Manual - FNB Outlets - G - 5.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "Recruitment",
+        "question": "Can my brother join the company?",
+        "expected_answer": "to specify the postion ( tables are summarized ) to keep them as they are / and highlt that my brother cant join the company",
+        "owner": "Mais",
+        "row_number": 7
+      },
+      "actual_answer": "I see you've switched topics to asking about your brother joining the company. Let me help with that. Great question! I'd be happy to help you find out if your brother can join the company. There are a couple of ways you can learn more about our recruitment process and requirements: If you’d like a clear, step-by-step guide on how new hires are brought onboard, I can share the workflow document (HRD - TRD - 013 - New Joiner - W - 1.md). Or, if you prefer to review the general policies and guidelines around recruitment, the policy document (HRD - TAD - 001 - Recruitment - P - 21.md) is a great resource. Just let me know your preference—would you like the detailed workflow, the general policy, or both? I’m here to help, so feel free to ask if you have any questions about the process or if you’re curious about eligibility criteria and next steps! ⚠️ Confidence: LOW (20%) 📚 Sources: TAD - 001 - Recruitment - P - 21, TRD - 013 - New Joiner - W - 1 ⚠️ Note: The answer does not directly address your question and is incomplete. It only lists documents without providing a summary or conclusion. Please request a direct answer or summary of the relevant po... 📋 Missing Information: Direct answer to whether the user's brother can join the company, Summary or explanation of relevant policy/guideline content, Any restrictions or ... 💡 Tip: Consider contacting HR for verification or requesting more specific information",
+      "response_time": 25.47581148147583,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TAD - 001 - Recruitment - P - 21.md",
+        "HRD - TAD - 001 - Recruitment - P - 21.md",
+        "HRD - TAD - 001 - Recruitment - P - 21.md",
+        "HRD - TRD - 013 - New Joiner - W - 1.md",
+        "HRD - TRD - 013 - New Joiner - W - 1.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 5.0,
+      "semantic_similarity": 0.5,
+      "completeness_score": 0.5,
+      "relevance_score": 0.5,
+      "evaluation_reasoning": "Evaluation failed: Error code: 404 - {'error': {'code': 'DeploymentNotFound', 'message': 'The API deployment for this resource does not exist. If you created the deployment within the last 5 minutes, please wait a moment and try again.'}}",
+      "improvement_suggestions": "Fix evaluation system",
+      "issues_found": [
+        "Evaluation system error"
+      ]
+    },
+    {
+      "question": {
+        "category": "Commission",
+        "question": "f the revenue was 50000$ and the comission rate is 2% and i worked 10 hours , what will be my comission?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 8
+      },
+      "actual_answer": "Great question! I'm happy to help you with your commission calculation. According to the current policy for store employees, your commission is simply calculated by multiplying your total sales revenue by the commission rate. The number of hours you've worked doesn't affect the commission amount, so you don't have to worry about that part. For your example, if your sales revenue was $50,000 and the commission rate is 2%, you would earn: $50,000 × 2% = $1,000 So, your commission for this period would be $1,000. If you have any questions about how commissions are paid out or want to know more about how the scheme works, feel free to ask! I'm here to help you understand all the details you need. 📊 Confidence: HIGH (95%) 📚 Sources: TRD - 006 - Commission Scheme for Store Employees - P - 6, ACC – Cash – 001 – Booking Bank Transactions – G – 1",
+      "response_time": 38.31257700920105,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "ACC – Cash – 001 – Booking Bank Transactions – G – 1.md",
+        "ACC – Cash – 001 – Booking Bank Transactions – G – 1.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "EMPLOYEE RELOCATION",
+        "question": "am relocating to another country what will be my allowance?",
+        "expected_answer": "i prefer to provide it as a table",
+        "owner": "Layan",
+        "row_number": 9
+      },
+      "actual_answer": "You've shifted the conversation to relocation and allowance. Let me assist you with your new query. That's an exciting step—I'd be happy to help you with information about your relocation allowance! When you're relocating to another country, the company provides a Relocation Allowance, which is a one-time payment. This amount is calculated as a percentage of your new basic salary and is designed to help cover the extra expenses that can come up during the move. The allowance will be paid in the currency of your destination country, and you'll receive it within 3 working days. Also, the company will arrange for economy air travel from your current location to the new country, making the transition a bit smoother. Just so you know, the exact details might vary depending on your specific situation and company policy. If you’d like, I can help you check the exact percentage or answer any other questions about the relocation process. Let me know if there’s anything else you’re curious about, such as settling-in support or housing options! 📊 Confidence: MEDIUM (60%) 📚 Sources: TRD - 012 - Employee Relocation - P - 16 ⚠️ Note: The answer does not specify the exact percentage or calculation method for your relocation allowance, and does not reference your specific situation or company policy. Please consult your HR depart...",
+      "response_time": 33.2654128074646,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 5.0,
+      "semantic_similarity": 0.5,
+      "completeness_score": 0.5,
+      "relevance_score": 0.5,
+      "evaluation_reasoning": "Evaluation failed: Error code: 404 - {'error': {'code': 'DeploymentNotFound', 'message': 'The API deployment for this resource does not exist. If you created the deployment within the last 5 minutes, please wait a moment and try again.'}}",
+      "improvement_suggestions": "Fix evaluation system",
+      "issues_found": [
+        "Evaluation system error"
+      ]
+    },
+    {
+      "question": {
+        "category": "EMPLOYEE RELOCATION",
+        "question": "am currently working on another country and am willing to resign what consequences i will be facing ?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 10
+      },
+      "actual_answer": "I see you've shifted from discussing salary and allowances to asking about the consequences of resigning while working in another country. Great question—I'm happy to help you navigate this process. If you're currently working in another country and considering resigning, here are a few things to keep in mind: You'll need to submit a formal resignation letter that includes your proposed last working day. Once that's done, your line manager will confirm when your last day will be, and HR will guide you through the separation process. Usually, this involves attending an exit interview and completing any clearance steps required by your employer. Resigning can also impact your employment visa and residency status. Depending on local laws, you may need to leave the country after your last working day, or you might be able to transfer your visa to a new employer. I'd recommend checking the specific regulations for the country you're in, as notice periods and visa requirements can vary. It's always a good idea to follow the official offboarding process to ensure everything goes smoothly. If you have questions about your final pay, benefits, or other related topics, just let me know—I'm here to help! 📊 Confidence: MEDIUM (60%) 📚 Sources: GEN - 007 - Employee Attendance - P - 16, TAD - 001 - Recruitment - P - 18, TMD - 002 - Employee Offboarding - W - 1 ⚠️ Note: The answer provides general guidance but lacks country-specific legal details and does not address potential financial or legal consequences. You should consult your HR department or a legal expert...",
+      "response_time": 32.33243918418884,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - GEN - 007 - Employee Attendance - P - 16.md",
+        "HRD - TAD - 001 - Recruitment - P - 18.md",
+        "HRD - TMD - 002 - Employee Offboarding - W - 1.md",
+        "HRD - TMD - 002 - Employee Offboarding - W - 1.md",
+        "HRD - TMD - 002 - Employee Offboarding - W - 1.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "EMPLOYEE RELOCATION",
+        "question": "in which currency i get my allowance?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 11
+      },
+      "actual_answer": "Great question! When you're relocated to another country, your allowance is provided in the currency of your new destination. If you're resigning and still eligible for a relocation allowance, it will also be settled in the currency of the country you're moving to, according to company policy. If you have any other questions about your relocation package or need details about the timing or process, just let me know—I'm here to help! 📊 Confidence: MEDIUM (60%) 📚 Sources: TRD - 012 - Employee Relocation - P - 16 ⚠️ Note: The answer does not integrate source information directly and lacks context about possible exceptions or variations in company policy. The user should verify with HR for specific cases.",
+      "response_time": 33.965887784957886,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    }
+  ]
+}

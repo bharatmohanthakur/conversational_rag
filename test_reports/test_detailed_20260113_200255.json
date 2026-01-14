@@ -1,0 +1,361 @@
+{
+  "timestamp": "20260113_200255",
+  "stats": {
+    "total": 10,
+    "passed": 2,
+    "failed": 8,
+    "errors": 0,
+    "avg_accuracy": 5.65,
+    "avg_response_time": 53.433976435661314
+  },
+  "results": [
+    {
+      "question": {
+        "category": "Inurance",
+        "question": "does my insurance covers me outside my residence country?",
+        "expected_answer": "Yes, Azadea provides travel medical insurance coverage for employees based in MEA, Africa, and GCC regions while traveling abroad on official business. This insurance covers emergency medical expenses, repatriation of mortal remains, life insurance benefits, and COVID-19 coverage. However, the coverage applies strictly to emergency treatment abroad and does not extend to planned or elective procedures. \"Abroad\" excludes Azadea's countries of operation, where employees remain entitled to the full policy benefits (both elective and emergency care). All emergency treatment abroad must be claimed on a reimbursement basis with the required documents submitted.",
+        "owner": "Layan",
+        "row_number": 2
+      },
+      "actual_answer": "I see you've switched to asking about insurance coverage. Let me help you with that. Great question! I understand it's important to know how your insurance works when you're outside your home country. Your insurance will cover you if you're traveling abroad for business purposes, but unfortunately, it doesn't extend to personal travel outside your residence country. So, to make sure you're covered, please ensure your travel is work-related. If you have specific destinations or situations in mind, let me know—I'm here to help you plan ahead! 📊 Confidence: MEDIUM (60%) 📚 Sources: TRV - 001 - Business Travel - B - 14, FNB - ADM - 001 - Accommodation Contract Rules - F - 1",
+      "response_time": 40.41443467140198,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "FNB - ADM - 001 - Accommodation Contract  Rules - F - 1.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 5.5,
+      "semantic_similarity": 0.55,
+      "completeness_score": 0.5,
+      "relevance_score": 0.7,
+      "evaluation_reasoning": "Let's break this down step by step. First, the AI does understand the basic intent of the user's question: they're asking if their insurance covers them outside their home country. The AI correctly identifies that the coverage applies when traveling abroad for business, not for personal travel, which is a good start. However, when we compare this to the expected answer, there are several gaps. The AI omits crucial details about what is actually covered (emergency medical expenses, repatriation, life insurance, COVID-19), and doesn't clarify that coverage is limited to emergencies and excludes elective procedures. It also fails to mention that 'abroad' excludes Azadea's countries of operation, which is a nuanced but important distinction. The answer doesn't explain the reimbursement process or the need for documentation. These omissions mean a user might not know what kind of medical events are covered or how to claim. On the positive side, the response is polite, clear, and avoids jargon, but it adds unnecessary conversational filler ('Great question!', 'let me know—I'm here to help you plan ahead!') that doesn't contribute to the user's understanding. The sources cited are vague and not directly helpful. Overall, the answer is partially correct but lacks depth and critical specifics, which could lead to misunderstandings or problems if the user needs to rely on their insurance abroad.",
+      "improvement_suggestions": "1. Clearly specify what types of coverage are included (emergency medical, repatriation, life insurance, COVID-19). 2. Explicitly state that coverage is only for emergencies, not elective procedures. 3. Clarify that 'abroad' excludes Azadea's countries of operation, and explain what this means. 4. Explain the reimbursement process and documentation requirements. 5. Remove filler language and focus on concise, factual information. 6. Reference sources more precisely or omit if not directly helpful.",
+      "issues_found": [
+        "Missing details about what is covered (emergency medical, repatriation, etc.)",
+        "Does not mention that coverage is for emergencies only",
+        "Fails to clarify the exclusion of Azadea's countries of operation",
+        "No mention of reimbursement process or documentation",
+        "Adds unnecessary conversational filler",
+        "Sources cited are vague"
+      ]
+    },
+    {
+      "question": {
+        "category": "maternity Leave",
+        "question": "can i extend my metirnaty leave ?",
+        "expected_answer": "Yes, you can extend your maternity leave under certain conditions. If you need to extend your leave, you must contact your Line Manager and obtain their approval. You may use your accumulated annual leave days, request unpaid leave, or consider it as sick leave if you provide a medical report, subject to the discretion of your Line Manager and the local HR Department. Failure to follow this process may result in disciplinary action for unauthorized or illegitimate absence.",
+        "owner": "Layan",
+        "row_number": 3
+      },
+      "actual_answer": "You've switched topics to questions about maternity leave. Let me help you with your query about extending maternity leave. Absolutely, I'd be happy to help with your question about extending your maternity leave. In many cases, it's possible to extend your maternity leave, even if you're currently working in another country or considering resigning. The best first step is to reach out to your Line Manager to discuss your options and get their approval. Depending on your situation, you might be able to use your accumulated annual leave, request unpaid leave, or take sick leave if you have a medical report. Keep in mind that the exact options can vary depending on the country where you're working, so it's a good idea to check your local policy or speak directly with HR for details. If you're planning to resign, you'll also need to submit a formal resignation letter. If you have any other questions about your leave or next steps, just let me know—I'm here to support you! 📊 Confidence: MEDIUM (60%) 📚 Sources: GEN - 004 - Maternity and Paternity Leaves - P - 13 ⚠️ Note: The answer provides general guidance but lacks specific details about your country or company's maternity leave extension policy. You should consult your HR department or local labor laws for preci...",
+      "response_time": 55.21633529663086,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 7.0,
+      "semantic_similarity": 0.8,
+      "completeness_score": 0.7,
+      "relevance_score": 0.85,
+      "evaluation_reasoning": "Let's break this down step by step. First, the AI clearly understands that the user is asking about extending maternity leave, which is good. It acknowledges the topic and provides a general process: contact your Line Manager, consider annual leave, unpaid leave, or sick leave with a medical report. These are all accurate and align with the expected answer. However, the AI adds some unnecessary context, like mentioning working in another country or resigning, which wasn't asked and could confuse the user. It also misses a critical point: the warning about disciplinary action for not following the process. This is important for users to know, as it sets expectations and consequences. The AI's answer is friendly and clear, but a bit verbose and less direct than the expected answer. It also places a lot of emphasis on checking local policy and HR, which is good for legal accuracy but could be more concise. The tone is supportive and professional, which is a plus. Overall, the answer is mostly correct but lacks some completeness and introduces minor irrelevant details.",
+      "improvement_suggestions": "1. Remove references to working in another country or resigning unless the user mentions these scenarios. 2. Explicitly state that failure to follow the process may result in disciplinary action for unauthorized absence. 3. Be more concise and focused on the user's direct question. 4. Keep the emphasis on contacting the Line Manager and HR, but avoid overgeneralizing. 5. Consider summarizing the options more clearly (annual leave, unpaid leave, sick leave with medical report).",
+      "issues_found": [
+        "Missing warning about disciplinary action for unauthorized absence",
+        "Unnecessary mention of working in another country or resigning",
+        "Slightly verbose and less focused on the direct question"
+      ]
+    },
+    {
+      "question": {
+        "category": "Remote working",
+        "question": "how can i submit my remote working leave",
+        "expected_answer": "Based on the available documents, to submit a remote working leave at Azadea, you should:\n\nEnsure you meet the eligibility criteria for remote work as outlined in the policy (e.g., illness, emergency travel, online training, or other significant reasons).\nSubmit your request through the standard leave request process, referring to the \"Leave Request | HRD - GEN - 002\" document.\nSeek approval from your line manager.\nIf working from another Azadea office during personal travel/leave, also obtain consent from the hosting country’s local HR department for the specific dates.\nPlease follow the official leave request procedures and obtain the necessary approvals as per company policy. If you need further details on the submission process, you may refer to the Leave Request policy or contact your HR department.",
+        "owner": "Layan",
+        "row_number": 4
+      },
+      "actual_answer": "I see you're now asking about submitting remote working leave, which is a specific type of leave. Now, turning to your question about submitting remote working leave—I'd be happy to guide you through the process! You can submit your remote working leave request in Oracle Applications by following these steps: From the main screen, go to the 'View' menu and select 'Requests' (as shown in the first image). In the 'Find Requests' window, choose 'All My Requests' or another appropriate filter. Click 'Submit a New Request...' at the bottom of the window (see the second image). Fill in the required details for your remote working leave. Submit your request for approval. Once you've submitted your request, it will be routed to your line manager for review and approval, as outlined in [HRD - GEN - 016 - Remote Working - P - 2.md] and [HRD - TRD - 020 - Employee Attendance Validation - G - 1.md]. This process applies to all Back-office Employees, and everything is managed through the HRMS system. If you have any questions about the process or need help with any of the steps, please let me know—I'm here to help! 📊 Confidence: HIGH (90%) 📚 Sources: TRD - 020 - Employee Attendance Validation - G - 1, GEN - 016 - Remote Working - P - 2",
+      "response_time": 65.42760848999023,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 020 - Employee Attendance Validation - G - 1.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - TRD - 020 - Employee Attendance Validation - G - 1.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 6.5,
+      "semantic_similarity": 0.7,
+      "completeness_score": 0.6,
+      "relevance_score": 0.8,
+      "evaluation_reasoning": "Let's break this down step by step. First, the AI does understand that the user is asking about submitting remote working leave, and it attempts to guide the user through the process, specifically referencing Oracle Applications and the HRMS system. However, when compared to the expected answer, there are several gaps. The AI omits crucial eligibility criteria (e.g., illness, emergency travel, online training, etc.) and doesn't mention the need to check these before submitting a request. It also fails to reference the specific 'Leave Request | HRD - GEN - 002' document, instead mentioning other policy documents that may or may not be directly relevant. Another important omission is the process for working from another Azadea office during personal travel/leave, which requires additional HR approval—this is not mentioned at all. The AI is clear and reasonably well-structured, and its tone is friendly and professional, but it leans heavily on the technical steps in Oracle rather than the broader policy context. For a real user, this answer would help with the mechanics of submitting a request but could lead to compliance issues if they don't realize there are eligibility requirements or extra approvals needed in some cases. The answer is not off-topic, but it's too narrow and misses some important policy steps. There is also a slight risk of confusion since the AI references documents (like HRD - GEN - 016 and TRD - 020) not mentioned in the expected answer, and doesn't clarify their relevance. In summary, the answer is acceptable for the technical process but incomplete and potentially misleading regarding policy compliance.",
+      "improvement_suggestions": "1. Explicitly mention the eligibility criteria for remote working leave and advise the user to check these before submitting a request. 2. Reference the correct policy document ('Leave Request | HRD - GEN - 002') as per the expected answer. 3. Include the step about obtaining local HR approval if working from another Azadea office during personal travel/leave. 4. Clarify the relevance of any referenced documents and ensure they align with the company's official process. 5. Consider summarizing the process before diving into technical steps, to give users a clear overview.",
+      "issues_found": [
+        "Missing eligibility criteria for remote working leave",
+        "Does not reference the main leave request policy document (HRD - GEN - 002)",
+        "Omits the requirement for local HR approval when working from another office",
+        "References documents not mentioned in the expected answer without context",
+        "Focuses too much on the Oracle process, not enough on policy compliance"
+      ]
+    },
+    {
+      "question": {
+        "category": "Road and Promotion",
+        "question": "what is road and when am i eligable for it",
+        "expected_answer": "Based on the available documents, \"ROAD\" refers to the End of Year (EOY) performance review rating used in Azadea’s internal processes for promotions and internal recruitment.\n\nEligibility for Promotion or Internal Recruitment (using ROAD):\n\nYou must have a minimum rating of \"Meets Expectations\" on your last EOY ROAD appraisal.\nIf you do not have a performance review rating, career recommendations such as \"Considered for Promotion\" or \"Identified for Succession Planning\" in the most recent check-in cycle can substitute for the EOY ROAD result.\nYou must not have any active disciplinary action.\nYou must have completed the required period in your current position (typically one year for managerial roles, six months for non-managerial roles).\nYou must not be under a Performance Improvement Plan (PIP).\nCareer recommendations of \"Needs Further Development\" or \"Unfit\" will make you ineligible, regardless of your ROAD score.\nIf you meet these criteria, you are eligible for promotion or internal recruitment based on your ROAD rating or equivalent career recommendations.",
+        "owner": "Layan",
+        "row_number": 5
+      },
+      "actual_answer": "I see you've changed the topic from leave policies to asking about 'road' and your eligibility for it. Let me help with that. Great question! ROAD, which stands for Remote Working Leave, is a policy designed to support back-office employees by allowing them to work from home instead of coming into the office, when certain conditions are met. You might be eligible for ROAD if your job duties don't require you to be physically present at your workplace, and you experience situations such as: Personal or immediate family illness, or other medical concerns Emergency travel outside your base country Challenges attending or delivering online training in the office Working during your annual leave Any other significant reason that prevents you from being onsite Eligible employees can use up to 30 cumulative days of remote working leave each year. Just keep in mind, this policy is specific to back-office roles, and your eligibility may depend on your position and situation. If you'd like guidance on how to apply or have questions about your individual circumstances, please let me know—I'm here to help! 📊 Confidence: MEDIUM (70%) 📚 Sources: GEN - 016 - Remote Working - P - 2",
+      "response_time": 49.47850847244263,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 2.0,
+      "semantic_similarity": 0.15,
+      "completeness_score": 0.1,
+      "relevance_score": 0.2,
+      "evaluation_reasoning": "Let's break this down step by step. First, on understanding: the AI completely misunderstood what 'ROAD' refers to in this context. The user was asking about 'ROAD' as it relates to promotion eligibility in Azadea, but the AI interpreted 'ROAD' as 'Remote Working Leave,' which is a totally different policy. So, right from the start, the answer is off-track. \n\nOn accuracy, the information provided about 'Remote Working Leave' might be correct in another context, but it's irrelevant and incorrect for the user's actual question. None of the expected details about performance reviews, ratings, or promotion eligibility are present. \n\nFor completeness, the answer fails to cover any of the key points from the expected answer: there's no mention of performance ratings, appraisal cycles, disciplinary actions, required tenure, or succession planning. \n\nRelevance is also very low because the answer focuses entirely on a different policy. This would likely confuse the user, who is seeking career progression information, not remote work guidelines. \n\nClarity-wise, the response is well-structured and easy to read, but that's not much help when the content is off-topic. \n\nMissing information includes every eligibility criterion for ROAD as a performance review, as well as the definition of ROAD in the context of promotions. \n\nExtra information: the AI gives a detailed explanation of 'Remote Working Leave,' which is not only unnecessary but actively misleading in this context. \n\nTone and style are friendly and professional, but again, that's overshadowed by the content mismatch. \n\nFrom a real user's perspective, this answer would not solve their problem at all. In fact, it could cause confusion or frustration, as it suggests the user asked about something totally different. Overall, this is a major failure in understanding and relevance.",
+      "improvement_suggestions": "1. Ensure the AI correctly identifies the context and meaning of terms like 'ROAD' based on the user's question and organizational context. 2. Directly address the user's query about promotion eligibility, referencing performance reviews and criteria as outlined in company policy. 3. Avoid providing unrelated policy information unless the user explicitly asks for it. 4. If unsure about the meaning of an acronym, the AI should ask for clarification or check for multiple definitions before responding.",
+      "issues_found": [
+        "Misunderstood the meaning of 'ROAD' in this context",
+        "Provided entirely irrelevant information",
+        "Omitted all key eligibility criteria for promotion",
+        "Could mislead or confuse the user",
+        "No mention of performance reviews, ratings, or internal recruitment"
+      ]
+    },
+    {
+      "question": {
+        "category": "Comission",
+        "question": "how to calculate my commision",
+        "expected_answer": "Based on the available documents, your commission as a store employee at Azadea is calculated as follows:\n\nCommission Formula\nThe monthly commission is calculated using this formula:\nCommission = Revenue x Commission Rate x Commissionable Working Hours\n\nRevenue: For sales staff, this is the daily net sales generated by your store divided by the sum of commissionable working hours of all commissionable employees.\nCommission Rate: This is determined by your position and specified in the salary structure.\nCommissionable Working Hours: The actual hours you worked, excluding lunch breaks and any type of paid leave. The maximum commissionable hours per month is 208. Any exception must be approved by the Regional Total Rewards Manager.\nSpecial Cases\n\nIf you temporarily support another store, your commission is based on the Revenue per Hour (RPH) of the supported store, but charged to your original store. Your working hours are counted with the supported store.\nRestrictions\n\nCommission is not paid to store support teams such as tailors, stock-keepers, technicians, and cleaners.\nExample Calculation:\nIf your store’s daily net sales are $10,000, the total commissionable hours for all employees is 100, your commission rate is 2%, and you worked 20 commissionable hours:\n\nRevenue per hour = $10,000 / 100 = $100\nYour commission = $100 x 2% x 20 = $40\nNote: The actual commission rate and sales figures will depend on your position and store performance.",
+        "owner": "Layan",
+        "row_number": 6
+      },
+      "actual_answer": "Great question! I'd be happy to help you understand how your commission is calculated. In general, your commission as a store employee is determined by multiplying your total sales revenue by the commission percentage that's assigned to your role. The formula looks like this: Commission = Total Sales Revenue × Commission Percentage According to the &quot;HRD - TRD - 006 - Commission Scheme for Store Employees&quot; document, your monthly income includes both a fixed basic salary and a commission, with the commission based on a percentage of the sales you generate. However, I should mention that the specific commission percentage for your position isn't detailed in the documents I have access to. While there are examples for other incentive programs (like Virgin Cover sales, which use rates such as 3%, 6%, or 10% depending on the tier), these are specific to those programs and not the general commission structure for all store employees. To find out your exact commission rate, I'd recommend checking your employment contract, your store’s commission policy, or reaching out directly to your HR or payroll team. They’ll be able to provide you with the precise percentage that applies to your role. If you’d like, I can also guide you on where to find this information or help draft a message to HR. Just let me know how I can support you further! 📊 Confidence: HIGH (95%) 📚 Sources: HRD – TRD – 034 – Service Incentive Virgin – P – 1, TRD - 006 - Commission Scheme for Store Employees - P - 6, ACC – Cash – 001 – Booking Bank Transactions – G – 1 ⚠️ Note: The answer does not specify your exact commission percentage, which is necessary to calculate your commission. You should consult your employment contract or HR department for this information.",
+      "response_time": 57.10334253311157,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "ACC – Cash – 001 – Booking Bank Transactions – G – 1.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "ACC – Cash – 001 – Booking Bank Transactions – G – 1.md",
+        "HRD – TRD – 034 – Service Incentive Virgin – P – 1.md",
+        "HRD – TRD – 034 – Service Incentive Virgin – P – 1.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 6.5,
+      "semantic_similarity": 0.7,
+      "completeness_score": 0.6,
+      "relevance_score": 0.8,
+      "evaluation_reasoning": "Let's break this down step by step. First, the AI does understand the core of the question—the user wants to know how to calculate their commission. It provides a general formula (Commission = Total Sales Revenue × Commission Percentage), which is directionally correct but lacks the nuance and specifics from the expected answer. The expected answer outlines a more complex formula involving revenue per hour, commissionable working hours, and a cap on hours, all of which are crucial for Azadea store employees. The AI response misses these details and instead focuses on a basic percentage calculation, which could mislead the user if their commission is not simply a flat percentage of sales. It does mention that the specific percentage is not provided and advises the user to check with HR, which is helpful, but it doesn't address the structure of commissionable hours, exceptions, or special cases like supporting another store. The response is clear and polite, with a professional tone, and offers to help further, which is good. However, it introduces examples from other incentive programs (Virgin Cover sales) that are not directly relevant and could confuse the user. Overall, the answer is acceptable for a generic inquiry but falls short for this specific context. A real user would likely still be confused about how their commission is actually calculated and might not realize the importance of commissionable hours or special cases. The answer would not fully solve the user's problem.",
+      "improvement_suggestions": "1. Include the full commission formula as specified for Azadea store employees, highlighting the role of commissionable working hours and the cap at 208 hours. 2. Mention how revenue is divided by the sum of commissionable hours for all employees, not just total sales. 3. Address special cases, such as supporting another store and how that affects calculation. 4. Avoid referencing unrelated incentive programs unless clearly marked as examples. 5. Clarify restrictions and exceptions, such as approval needed for exceeding maximum hours. 6. Make the answer more tailored to Azadea's documented process.",
+      "issues_found": [
+        "Misses key details about commissionable working hours and cap",
+        "Does not mention revenue per hour calculation",
+        "References unrelated incentive programs (Virgin Cover sales)",
+        "Lacks information on special cases and restrictions",
+        "Could mislead user into thinking commission is a flat percentage of sales"
+      ]
+    },
+    {
+      "question": {
+        "category": "Recruitment",
+        "question": "Can my brother join the company?",
+        "expected_answer": "to specify the postion ( tables are summarized ) to keep them as they are / and highlt that my brother cant join the company",
+        "owner": "Mais",
+        "row_number": 7
+      },
+      "actual_answer": "It looks like you've changed the topic to asking about your brother joining the company. That's a great question—thanks for asking! According to AZADEA's company policy, direct relatives such as siblings of current employees or shareholders aren't eligible to be hired. This policy is in place to avoid any potential conflicts of interest within the company. If your brother is interested in opportunities elsewhere, I'd be happy to share resources or tips on job searching. And if you have any more questions about company policies or referrals, just let me know—I'm here to help! 📊 Confidence: MEDIUM (70%) 📚 Sources: TAD - 001 - Recruitment - P - 21, TAD - 001 - Recruitment - P - 18, GEN - 006 - Employee Leaves - P - 15 ⚠️ Note: The answer does not integrate sources directly into the text and lacks context from the referenced policies. If your situation is unique or you need clarification on definitions or exceptions, cons...",
+      "response_time": 50.81992554664612,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TAD - 001 - Recruitment - P - 21.md",
+        "HRD - TAD - 001 - Recruitment - P - 21.md",
+        "HRD - TAD - 001 - Recruitment - P - 21.md",
+        "HRD - TAD - 001 - Recruitment - P - 18.md",
+        "HRD - GEN - 006 - Employee Leaves - P - 15.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 8.0,
+      "semantic_similarity": 0.85,
+      "completeness_score": 0.7,
+      "relevance_score": 0.9,
+      "evaluation_reasoning": "Let's break this down step by step. First, the AI clearly understood the user's question about whether their brother can join the company, and it responded directly to that. The core information is accurate: it states that, according to AZADEA's policy, direct relatives such as siblings aren't eligible for employment, which matches the expected answer's requirement to highlight that the brother can't join. \n\nHowever, the expected answer also called for specifying the position (with reference to summarized tables) and to 'keep them as they are.' The AI's answer doesn't address positions or reference any summarized tables, which could be important if the policy varies by role or if the user needs to see which positions are affected. The AI does mention sources, but it doesn't integrate them into the explanation, which would help with transparency and user trust. \n\nThe answer is clear, polite, and professional, with a helpful tone. It offers to provide job search resources for the brother, which is a nice touch, though not strictly necessary. The main issue is the lack of detail about positions and the absence of direct references to the summarized tables. For a user who wants to know if there are exceptions or specific roles where the policy might differ, the answer doesn't provide enough information. \n\nOverall, the answer is mostly accurate and relevant, but it's incomplete in terms of the expected detail and integration of policy references.",
+      "improvement_suggestions": "1. Explicitly mention that the policy applies to all positions, or clarify if there are exceptions by referencing the summarized tables. 2. Integrate the source references directly into the explanation, so users can see where the information comes from. 3. Briefly explain what the summarized tables show, or provide a link/attachment if possible. 4. Consider adding a sentence inviting the user to specify a position if they want to check for exceptions.",
+      "issues_found": [
+        "Does not specify positions or reference summarized tables as expected",
+        "Sources are listed but not integrated into the explanation",
+        "Does not clarify if there are any exceptions or nuances in the policy",
+        "Slightly off-topic with job search tips (not strictly necessary)"
+      ]
+    },
+    {
+      "question": {
+        "category": "Commission",
+        "question": "f the revenue was 50000$ and the comission rate is 2% and i worked 10 hours , what will be my comission?",
+        "expected_answer": "Based on the commission scheme for store employees, the commission is calculated as follows:\n\nCommission = Revenue x Commission Rate x Commissionable Working Hours\n\nGiven:\n\nRevenue = $50,000\nCommission Rate = 2% (or 0.02)\nCommissionable Working Hours = 10\nCommission = $50,000 x 0.02 x 10 = $10,000\n\nHowever, please note that the actual formula in the policy is: Commission = Revenue per hour x Commission Rate x Commissionable Working Hours\n\nRevenue per hour is calculated as: Revenue per hour = Total Revenue / Total Commissionable Working Hours of all commissionable employees\n\nTo accurately calculate your commission, you need to know the revenue per hour (not just total revenue), which depends on the total commissionable hours for all employees in the store. If you provide that number, I can give you the exact commission amount.\n\nBased on the available information, I cannot provide the exact commission without the total commissionable hours for all employees.",
+        "owner": "Layan",
+        "row_number": 8
+      },
+      "actual_answer": "I see you've shifted to a question about commission calculation. Let me help you with that. Great question! Let me help you with that. According to the commission scheme for store employees, your commission is simply calculated by multiplying your total sales revenue by the commission rate—so the number of hours you worked doesn’t affect this calculation. With your sales revenue of $50,000 and a commission rate of 2%, your commission will come out to $1,000. If you’re interested, I can also share more details about how commissions work or other aspects of the compensation structure. Just let me know if you have any other questions—I'm here to help! 📊 Confidence: HIGH (95%) 📚 Sources: TRD - 006 - Commission Scheme for Store Employees - P - 6, ACC – Cash – 001 – Booking Bank Transactions – G – 1",
+      "response_time": 55.21402645111084,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "ACC – Cash – 001 – Booking Bank Transactions – G – 1.md",
+        "ACC – Cash – 001 – Booking Bank Transactions – G – 1.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 4.0,
+      "semantic_similarity": 0.5,
+      "completeness_score": 0.4,
+      "relevance_score": 0.7,
+      "evaluation_reasoning": "Let's break this down step by step:\n\n1. **Understanding Check**: The AI recognizes the question is about commission calculation and attempts to answer it. However, it makes a critical assumption: it ignores the mention of '10 hours' and asserts that hours worked are irrelevant to the calculation. This shows a partial understanding but misses the nuance of the policy described in the expected answer.\n\n2. **Accuracy Check**: The AI's calculation ($50,000 x 2% = $1,000) is mathematically correct for a simple commission structure, but it does not align with the commission policy described in the expected answer. The expected answer clearly states that the calculation depends on 'revenue per hour', which requires knowing the total commissionable hours for all employees. The AI's answer is therefore inaccurate in this context.\n\n3. **Completeness Check**: The AI omits a key part of the calculation (revenue per hour and the need for total commissionable hours). It also fails to mention that more information is needed to provide an exact answer, which is crucial for transparency and user understanding.\n\n4. **Relevance Check**: The response is mostly on-topic, as it addresses commission calculation, but by ignoring the hours worked and the need for more data, it veers away from the specifics of the user's scenario and the actual policy.\n\n5. **Clarity Check**: The answer is clearly written and easy to follow. The structure is friendly and approachable, which is good, but the clarity is undermined by the incorrect explanation of the policy.\n\n6. **Missing Information**: The AI does not explain the actual formula used by the company, does not mention the need for total commissionable hours, and does not clarify that the answer given may be incorrect without this information.\n\n7. **Extra Information**: The AI adds a friendly offer to explain more about commissions, which is fine, but it also confidently asserts a calculation that is not supported by the policy. The 'Confidence: HIGH (95%)' and sources are misleading, as the answer is not actually aligned with the referenced policy.\n\n8. **Tone & Style**: The tone is friendly and professional, which is a plus. However, the overconfidence in the answer (stating 'simply calculated' and 'Confidence: HIGH (95%)') is inappropriate given the missing context.\n\n**Edge Cases & User Helpfulness**: A real user would likely be misled by this answer, believing their commission is $1,000 when in reality, the calculation could be very different depending on total hours worked by all employees. The answer does not solve the user's actual problem and could create confusion or false expectations.\n\n**Implied/Missing**: The AI's answer implies a simpler commission structure than actually exists, which is a significant issue.",
+      "improvement_suggestions": "1. Clearly state that the commission calculation depends on the company's specific policy, which requires knowing the total commissionable hours for all employees.\n2. Explain the correct formula and why the user's number of hours is relevant.\n3. Inform the user that without the total commissionable hours, an exact commission cannot be calculated.\n4. Avoid overconfident statements (like 'Confidence: HIGH') when the answer is incomplete or based on assumptions.\n5. Reference the policy accurately and transparently.",
+      "issues_found": [
+        "Incorrect application of commission policy",
+        "Omission of key variables (total commissionable hours)",
+        "Misleading confidence statement",
+        "Failure to clarify need for more information",
+        "Potential to mislead user about their actual commission"
+      ]
+    },
+    {
+      "question": {
+        "category": "EMPLOYEE RELOCATION",
+        "question": "am relocating to another country what will be my allowance?",
+        "expected_answer": "i prefer to provide it as a table",
+        "owner": "Layan",
+        "row_number": 9
+      },
+      "actual_answer": "You've shifted the discussion to relocation allowances. Let me assist you with information about allowances when relocating to another country. Great question! If you're relocating to another country for work, the company provides a Relocation Allowance to help cover the extra expenses that come with moving. This is a one-time payment, usually calculated as a percentage of your new basic salary, and it's paid in the currency of your destination country—typically within 3 working days. In addition to the allowance, the company also arranges economy air travel from your current location to your new destination. Just a heads up: the exact percentage of the allowance or eligibility for a second relocation allowance within a year can depend on your specific circumstances and the company's requirements. If you have details about your role or destination, or if you'd like to know more about the process, feel free to share—I’m here to help! Also, if you’re curious about other aspects of relocating, like settling-in support or moving your family, just let me know. 📊 Confidence: MEDIUM (60%) 📚 Sources: TRD - 012 - Employee Relocation - P - 16 ⚠️ Note: The answer does not specify the exact allowance amount or percentage, and lacks context about your specific situation. Please consult your HR department or relocation policy for precise details.",
+      "response_time": 54.01416754722595,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 6.0,
+      "semantic_similarity": 0.6,
+      "completeness_score": 0.5,
+      "relevance_score": 0.7,
+      "evaluation_reasoning": "Let's break this down step by step. First, the AI does recognize the user's question is about relocation allowance and provides a general overview of what a relocation allowance is, how it's paid, and mentions some related benefits (like air travel). So, on a basic level, it understands the topic. However, the expected answer was for the AI to present the information as a table, which is not done here at all. This is a significant miss, as the user explicitly wanted the answer in a tabular format, likely for clarity and easy comparison. \n\nAccuracy-wise, the information provided is generally correct but quite generic. It doesn't specify any actual allowance amounts, percentages, or concrete examples, and it even points out that it can't give exact figures. This is a safe approach but not very helpful for the user. \n\nIn terms of completeness, the answer is lacking. It doesn't provide a table or any structured breakdown of possible allowances, which the user asked for. It also doesn't cover any variations or scenarios that might affect the allowance, nor does it summarize the information in a way that's easy to digest at a glance. \n\nRelevance is moderate—the answer is on-topic but padded with extra commentary and offers to help with other questions, which could be distracting. It also includes a 'confidence' score and source, which, while transparent, doesn't add value for the user in this context. \n\nClarity is decent; the language is friendly and understandable, but the structure is verbose and not as concise or organized as a table would be. \n\nKey missing information: The table format, specific allowance examples, and a clear, structured summary. \n\nExtra information: The answer includes a lot of hedging, offers to help with other topics, and meta-commentary about the answer's limitations. \n\nTone and style are friendly and professional, but the lack of structure and directness reduces the effectiveness for a user who wants a quick, clear answer.",
+      "improvement_suggestions": "1. Present the information in a table as requested, even if with example or placeholder values. 2. Summarize key points (e.g., allowance percentage, payment timing, eligibility) in the table for clarity. 3. Reduce extraneous commentary and focus on directly answering the user's question. 4. If specifics aren't available, say so succinctly in the table or as a note below it. 5. Offer to provide more details if the user shares their role or destination, but keep this brief.",
+      "issues_found": [
+        "Did not provide information in a table as requested",
+        "Lacks specific allowance figures or examples",
+        "Verbose and includes unnecessary commentary",
+        "Does not summarize or structure information clearly",
+        "Confidence score and source citation are not helpful for the user"
+      ]
+    },
+    {
+      "question": {
+        "category": "EMPLOYEE RELOCATION",
+        "question": "am currently working on another country and am willing to resign what consequences i will be facing ?",
+        "expected_answer": "Based on the available documents, if you resign before completing one year of service in your current destination country, you will be required to pay back the relocation allowance on a prorated basis. The amount to be repaid will be deducted from your last paycheck.\n\nIf you have received company-provided accommodation or a relocation allowance, these benefits are subject to repayment as described above. There are no other specific consequences mentioned in the provided documents regarding resignation.",
+        "owner": "Layan",
+        "row_number": 10
+      },
+      "actual_answer": "I see you've shifted from asking about relocation allowances to the consequences of resigning while working in another country. Great question! If you're considering resigning while working in another country, there are a few key things to be aware of: Resignation Process: You'll need to submit your resignation letter, including your proposed last working day. Your line manager will confirm your final day, and HR will handle the necessary paperwork to update your employment end date. Visa and Residency: Resigning can directly affect your employment visa and residency permit. Depending on the local laws and your future plans, you may need to leave the country or transfer your visa to a new employer. It's a good idea to check what applies in your specific location. Accommodation: If you're staying in company-provided housing, make sure to provide documentation of your resignation. This helps you avoid any penalties. Leaving before your lease ends without proper notice could result in salary deductions for the remaining lease period. Exit Interview and Clearance: Before your departure, you'll participate in an exit interview and complete clearance procedures as part of the offboarding process. Since the exact details can vary depending on the country and your contract, I recommend reaching out to your local HR team for guidance tailored to your situation. If you’d like, I can also suggest questions to ask them or help you prepare for the next steps. Just let me know how I can assist! 📊 Confidence: MEDIUM (60%) 📚 Sources: TMD - 002 - Employee Offboarding - W - 1, GEN - 007 - Employee Attendance - P - 16, FNB - ADM - 001 - Accommodation Contract Rules - F - 1, TRD - 012 - Employee Relocation - P - 16 ⚠️ Note: The answer provides a general overview but lacks country-specific legal details and may not cover all critical consequences. Please consult your local HR or legal advisor for advice tailored to you...",
+      "response_time": 68.24317049980164,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TMD - 002 - Employee Offboarding - W - 1.md",
+        "HRD - TMD - 002 - Employee Offboarding - W - 1.md",
+        "FNB - ADM - 001 - Accommodation Contract  Rules - F - 1.md",
+        "FNB - ADM - 001 - Accommodation Contract  Rules - F - 1.md",
+        "FNB - ADM - 001 - Accommodation Contract  Rules - F - 1.md",
+        "HRD - GEN - 007 - Employee Attendance - P - 16.md",
+        "FNB - ADM - 001 - Accommodation Contract  Rules - F - 1.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 5.5,
+      "semantic_similarity": 0.65,
+      "completeness_score": 0.5,
+      "relevance_score": 0.7,
+      "evaluation_reasoning": "Let's break this down step by step. First, does the AI understand the question? The user is asking specifically about the consequences of resigning while working in another country, likely in the context of an employer-sponsored relocation. The AI recognizes the general topic but doesn't zero in on the most critical, document-based consequence: the repayment of the relocation allowance if resigning before one year. \n\nOn accuracy, the AI's answer is mostly correct in terms of general HR processes (resignation letter, exit interview, visa implications, etc.), but it omits the most important, specific policy: the prorated repayment of relocation benefits. This is a significant oversight because, according to the expected answer, this is the main documented consequence. The AI does mention accommodation and possible deductions if leaving early, but it frames this as a lease issue rather than a relocation benefit repayment, which is misleading. \n\nIn terms of completeness, the response is lacking. It covers general HR procedures and some practicalities, but it doesn't mention the key consequence (repayment of relocation allowance) or specify that the amount will be deducted from the final paycheck. It also fails to clarify that, per the documents, there are no other specific consequences. \n\nRelevance is mixed: while the answer stays on the topic of resignation consequences, it veers into generalities (exit interview, generic HR advice) and spends time on visa/residency, which, while important, is not the focus of the provided documentation. The AI also adds a disclaimer about legal advice and offers to help further, which is nice but doesn't compensate for the missing core information. \n\nClarity is decent—the answer is readable and structured—but the lack of specificity may confuse users about what the real, documented consequences are. \n\nFor a real user, the most pressing concern is likely financial liability upon resignation, especially if they received relocation support. The AI's answer doesn't address this head-on, which could leave the user unprepared for a potentially significant deduction from their final pay. \n\nEdge cases (e.g., resigning after one year, not receiving relocation allowance) aren't addressed, nor is there any mention of the absence of other consequences per the documents. \n\nOverall, the answer is acceptable as a general HR overview but fails to deliver the critical, document-based information the user needs.",
+      "improvement_suggestions": "1. Explicitly state that resigning before one year requires repayment of the relocation allowance on a prorated basis, as per the documents. 2. Clarify that the repayment will be deducted from the final paycheck. 3. Mention that company-provided accommodation or relocation allowance benefits are subject to the same repayment rule. 4. State that, according to the documents, there are no other specific consequences. 5. Reduce generic HR process details and focus more on the documented financial and contractual consequences. 6. Optionally, add a brief note about visa/residency only if relevant to the company's policy, but don't let it overshadow the main point.",
+      "issues_found": [
+        "Omission of key policy: repayment of relocation allowance",
+        "Lack of specificity regarding financial consequences",
+        "Overemphasis on generic HR processes",
+        "Misleading framing of accommodation as a lease issue rather than a benefit subject to repayment",
+        "No mention that there are no other specific consequences per documents"
+      ]
+    },
+    {
+      "question": {
+        "category": "EMPLOYEE RELOCATION",
+        "question": "in which currency i get my allowance?",
+        "expected_answer": "According to the policy, the relocation allowance is paid by the destination country/company in the local currency.",
+        "owner": "Layan",
+        "row_number": 11
+      },
+      "actual_answer": "I see you've switched to asking about the currency of your allowance. Let me help with that. Great question! If you're currently working in another country and decide to resign, your allowance or final settlement will be paid in the currency of the country where you're working. So, for example, if you're based in the United Arab Emirates, you'd receive your final settlement in AED (United Arab Emirates Dirham). Just so you know, the exact details can sometimes depend on your location and your employment contract, so it's a good idea to check your contract or reach out to HR for any specifics. If you'd like, I can also guide you on what to expect during the resignation process or answer any other questions related to your final payments. 📊 Confidence: MEDIUM (60%) 📚 Sources: TRD - 033 - Exit Employees Final Settlement Payment - G - 1, TRD - 012 - Employee Relocation - P - 16, TMD - 004 - Employee Transfer - B - 5 ⚠️ Note: The answer assumes 'allowance' refers to your final settlement upon resignation, which may not match your intended meaning. If you are asking about a different type of allowance (e.g., monthly or r...",
+      "response_time": 38.40824484825134,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 033 - Exit Employees Final Settlement Payment - G - 1.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TMD - 004 - Employee Transfer - B - 5.md",
+        "HRD - TMD - 004 - Employee Transfer - B - 5.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 5.5,
+      "semantic_similarity": 0.6,
+      "completeness_score": 0.5,
+      "relevance_score": 0.6,
+      "evaluation_reasoning": "Let's break this down step by step. First, the AI seems to misunderstand the user's question. The user asked, 'in which currency i get my allowance?', which, given the context of 'EMPLOYEE RELOCATION', should be interpreted as a question about the relocation allowance, not final settlement or resignation. The AI incorrectly assumes the user is asking about their final settlement upon resignation, which is a significant misinterpretation. This leads to a partially off-topic answer. \n\nIn terms of accuracy, the information about being paid in the local currency of the country where you're working is generally correct, but it is applied to the wrong allowance type. The expected answer specifically mentions that the relocation allowance is paid by the destination country/company in the local currency, which the AI does not state. Instead, it focuses on final settlement, which is not what was asked. \n\nCompleteness is lacking because the AI does not address the relocation allowance at all, nor does it clarify the policy or mention the role of the destination company. It also doesn't provide a general policy statement, which would be helpful. \n\nRelevance is also impacted because a large portion of the answer is about resignation and final settlements, which is not what the user asked. The AI does hedge a bit, noting that the meaning of 'allowance' could vary, but this is at the very end and doesn't correct the main focus of the answer. \n\nClarity is generally good—the answer is well-written and easy to follow, but since it's not answering the right question, this doesn't help the user much. \n\nA real user would likely be confused or frustrated, as their actual question about relocation allowance remains unanswered. The answer also includes some unnecessary details about resignation and final settlements, which are not relevant. \n\nOverall, the main issue is a misunderstanding of the user's intent, leading to an answer that is only partially relevant and not very helpful in this context.",
+      "improvement_suggestions": "1. Focus on the specific type of allowance mentioned in the user's question and context—here, the relocation allowance.\n2. Clearly state the policy: 'Relocation allowance is paid by the destination country/company in the local currency.'\n3. Avoid assuming the user is resigning unless explicitly stated.\n4. If unsure about the type of allowance, ask a clarifying question before providing a detailed answer.\n5. Remove unnecessary details about final settlements and resignation unless directly relevant.",
+      "issues_found": [
+        "Misunderstood the user's question (focused on final settlement instead of relocation allowance)",
+        "Did not mention the policy about relocation allowance",
+        "Included irrelevant information about resignation",
+        "Did not clarify or confirm the user's intent before answering"
+      ]
+    }
+  ]
+}

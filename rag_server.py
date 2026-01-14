@@ -1852,16 +1852,27 @@ async def greeting_detection_node(state: AgentState):
             ("user", "{query}")
         ])
         
-        chain = prompt | agent_llm.with_structured_output(GreetingDetectionOutput)
-        result = await chain.ainvoke({"query": query})
-        
-        logger.info(f"Greeting detection: Structured LLM result - is_greeting={result.is_greeting}, type={result.greeting_type}")
-        return {
-            "is_greeting": result.is_greeting,
-            "greeting_type": result.greeting_type
-        }
+        # Add retry logic
+        max_retries = 2
+        for attempt in range(max_retries):
+            try:
+                chain = prompt | agent_llm.with_structured_output(GreetingDetectionOutput)
+                result = await chain.ainvoke({"query": query})
+                
+                logger.info(f"Greeting detection: Structured LLM result - is_greeting={result.is_greeting}, type={result.greeting_type}")
+                return {
+                    "is_greeting": result.is_greeting,
+                    "greeting_type": result.greeting_type
+                }
+            except Exception as e:
+                logger.warning(f"Greeting detection structured output error (attempt {attempt+1}/{max_retries}): {e}")
+                if attempt == max_retries - 1:
+                    # Final fallback: use pattern matching
+                    is_greeting = is_greeting_or_casual(query, conversation_history)
+                    return {"is_greeting": is_greeting}
+                await asyncio.sleep(0.5)
     except Exception as e:
-        logger.error(f"Error in structured greeting detection: {e}")
+        logger.error(f"Error in greeting detection: {e}")
         # Final fallback: use pattern matching
         is_greeting = is_greeting_or_casual(query, conversation_history)
         return {"is_greeting": is_greeting}
@@ -2015,9 +2026,28 @@ async def router_node(state: AgentState):
                    "- 'GENERIC' if the query is ambiguous, too broad, or MISSES CRITICAL CONTEXT (like Country/Location) causing the answer to vary (e.g., 'How many days maternity leave?', 'What are the travel allowances?', 'How can I benefit from insurance?'). These need clarification."),
         ("user", "{query}")
     ])
-    chain = prompt | agent_llm.with_structured_output(RouterOutput)
-    result = await chain.ainvoke({"query": query})
-    return {"complexity": result.complexity}
+    
+    # Add error handling with retry
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            chain = prompt | agent_llm.with_structured_output(RouterOutput)
+            result = await chain.ainvoke({"query": query})
+            return {"complexity": result.complexity}
+        except Exception as e:
+            logger.warning(f"Router structured output error (attempt {attempt+1}/{max_retries}): {e}")
+            if attempt == max_retries - 1:
+                # Fallback: use simple heuristics
+                query_lower = query.lower()
+                if any(word in query_lower for word in ["compare", "difference", "vs", "versus", "both"]):
+                    return {"complexity": "COMPLEX"}
+                elif any(word in query_lower for word in ["table", "bullet", "points", "format", "summarize"]):
+                    return {"complexity": "FORMAT"}
+                elif len(query.split()) < 5 or any(word in query_lower for word in ["how many", "what are", "when", "where"]):
+                    return {"complexity": "GENERIC"}
+                else:
+                    return {"complexity": "SIMPLE"}
+            await asyncio.sleep(0.5)  # Brief delay before retry
 
 # 2. Simple Handler (Direct RAG)
 class SimpleRAGOutput(BaseModel):
@@ -2160,8 +2190,35 @@ async def simple_rag_node(state: AgentState):
     else:
         messages.append(("user", f"Context:\n{context}\n\nQuestion: {query}"))
         
-    chain = agent_llm.with_structured_output(SimpleRAGOutput)
-    result = await chain.ainvoke(messages)
+    # Add error handling with retry
+    max_retries = 2
+    result = None
+    for attempt in range(max_retries):
+        try:
+            chain = agent_llm.with_structured_output(SimpleRAGOutput)
+            result = await chain.ainvoke(messages)
+            break  # Success
+        except Exception as e:
+            logger.warning(f"Simple RAG structured output error (attempt {attempt+1}/{max_retries}): {e}")
+            if attempt == max_retries - 1:
+                # Fallback: generate answer without structured output
+                logger.warning(f"Simple RAG failed, using fallback answer generation")
+                response = await agent_llm.ainvoke(messages)
+                return {
+                    "final_answer": response.content,
+                    "sources": sources,
+                    "images": retrieved_images
+                }
+            await asyncio.sleep(0.5)
+    
+    if not result:
+        # Safety fallback
+        response = await agent_llm.ainvoke(messages)
+        return {
+            "final_answer": response.content,
+            "sources": sources,
+            "images": retrieved_images
+        }
     
     if result.status == "NEEDS_CLARIFICATION":
         # Pass control to Clarifier node
@@ -2222,28 +2279,39 @@ CRITICAL RULES:
         ("user", "Original Query: {query}\n\nAnalyze this query using chain of thought reasoning and determine if it should be decomposed.")
     ])
     
-    chain = prompt | agent_llm.with_structured_output(DecompositionOutput)
-    result = await chain.ainvoke({"query": query})
-    
-    # Log the reasoning for debugging
-    logger.info(f"🧠 Decomposition Analysis: needs_decomposition={result.needs_decomposition}, reasoning={result.reasoning[:150]}...")
-    
-    # If not decomposable, ensure we return the original query as single sub-query
-    if not result.needs_decomposition or len(result.sub_queries) == 0:
-        logger.info(f"📌 Query not decomposable or empty sub-queries - using original query as single sub-query")
-        return {"sub_queries": [query]}
-    
-    # Validate that sub-queries preserve original intent
-    if len(result.sub_queries) == 1:
-        logger.info(f"📌 Only one sub-query generated - using original query to preserve intent")
-        return {"sub_queries": [query]}
-    
-    # Log sub-queries for verification
-    logger.info(f"✅ Query decomposed into {len(result.sub_queries)} sub-queries preserving original intent")
-    for i, sub_q in enumerate(result.sub_queries, 1):
-        logger.info(f"   Sub-query {i}: {sub_q[:80]}...")
-    
-    return {"sub_queries": result.sub_queries}
+    # Add error handling with retry
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            chain = prompt | agent_llm.with_structured_output(DecompositionOutput)
+            result = await chain.ainvoke({"query": query})
+            
+            # Log the reasoning for debugging
+            logger.info(f"🧠 Decomposition Analysis: needs_decomposition={result.needs_decomposition}, reasoning={result.reasoning[:150]}...")
+            
+            # If not decomposable, ensure we return the original query as single sub-query
+            if not result.needs_decomposition or len(result.sub_queries) == 0:
+                logger.info(f"📌 Query not decomposable or empty sub-queries - using original query as single sub-query")
+                return {"sub_queries": [query]}
+            
+            # Validate that sub-queries preserve original intent
+            if len(result.sub_queries) == 1:
+                logger.info(f"📌 Only one sub-query generated - using original query to preserve intent")
+                return {"sub_queries": [query]}
+            
+            # Log sub-queries for verification
+            logger.info(f"✅ Query decomposed into {len(result.sub_queries)} sub-queries preserving original intent")
+            for i, sub_q in enumerate(result.sub_queries, 1):
+                logger.info(f"   Sub-query {i}: {sub_q[:80]}...")
+            
+            return {"sub_queries": result.sub_queries}
+        except Exception as e:
+            logger.warning(f"Decomposer structured output error (attempt {attempt+1}/{max_retries}): {e}")
+            if attempt == max_retries - 1:
+                # Fallback: don't decompose
+                logger.info(f"📌 Decomposition failed, using original query as single sub-query")
+                return {"sub_queries": [query]}
+            await asyncio.sleep(0.5)
 
 # 4. Executor (Complex Path)
 async def executor_node(state: AgentState):
@@ -2594,8 +2662,34 @@ RULES FOR CLARIFICATION (only if truly needed):
         ("user", f"User's question: {query}\n\nAvailable context from knowledge base:\n{context}\n\nDecide: Can you provide a direct answer? If yes, provide it. If no, explain why and ask 2-3 clarifying questions.")
     ])
     
-    chain = prompt | agent_llm.with_structured_output(ClarificationOutput)
-    result = await chain.ainvoke({"query": query, "context": context})
+    # Add error handling with retry
+    max_retries = 2
+    result = None
+    for attempt in range(max_retries):
+        try:
+            chain = prompt | agent_llm.with_structured_output(ClarificationOutput)
+            result = await chain.ainvoke({"query": query, "context": context})
+            break  # Success
+        except Exception as e:
+            logger.warning(f"Clarifier structured output error (attempt {attempt+1}/{max_retries}): {e}")
+            if attempt == max_retries - 1:
+                # Fallback: try to answer directly
+                logger.warning(f"Clarifier failed, attempting direct answer as fallback")
+                messages = [
+                    ("system", "You are a helpful HR assistant. Answer the user's question based on the context provided."),
+                    ("user", f"Question: {query}\n\nContext:\n{context}\n\nProvide a helpful answer.")
+                ]
+                response = await agent_llm.ainvoke(messages)
+                return {
+                    "final_answer": response.content,
+                    "sources": sources,
+                    "awaiting_clarification": False
+                }
+            await asyncio.sleep(0.5)
+    
+    if not result:
+        # Should not reach here, but safety check
+        return {"final_answer": "I apologize, but I encountered an error processing your question.", "sources": sources, "awaiting_clarification": False}
     
     # Check if we can answer directly
     if result.can_answer_directly and result.direct_answer:

@@ -1,0 +1,80 @@
+{
+  "timestamp": "20260114_040156",
+  "stats": {
+    "total": 2,
+    "passed": 1,
+    "failed": 1,
+    "errors": 0,
+    "avg_accuracy": 7.0,
+    "avg_response_time": 56.895992040634155
+  },
+  "results": [
+    {
+      "question": {
+        "category": "Recruitment",
+        "question": "Can my brother join the company?",
+        "expected_answer": "to specify the postion ( tables are summarized ) to keep them as they are / and highlt that my brother cant join the company",
+        "owner": "Mais",
+        "row_number": 7
+      },
+      "actual_answer": "I see you've changed the topic from salary and allowances to asking about your brother joining the company. Great question! I understand you'd like to know if your brother can join Azadea while you're working here. According to our Recruitment of Relatives policy (HRD - TAD - 001 - Recruitment - P - 21), Azadea doesn't allow the hiring of direct relatives—including siblings—of current employees or shareholders for either full-time or part-time positions. So, as long as you're employed with us, your brother wouldn't be eligible for recruitment at Azadea. If you have any other questions about our hiring policies or if there's anything else you'd like to know about opportunities for family members, just let me know—I'm here to help! 📊 Confidence: HIGH (95%) 📚 Sources: TAD - 001 - Recruitment - P - 21, GEN - 006 - Employee Leaves - P - 15, TRD - 028 - VIP Customer - G - 1",
+      "response_time": 50.92772579193115,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TAD - 001 - Recruitment - P - 21.md",
+        "HRD - TAD - 001 - Recruitment - P - 21.md",
+        "HRD - TAD - 001 - Recruitment - P - 21.md",
+        "HRD - GEN - 006 - Employee Leaves - P - 15.md",
+        "HRD - TRD - 028 - VIP Customer - G - 1.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 8.0,
+      "semantic_similarity": 0.85,
+      "completeness_score": 0.8,
+      "relevance_score": 0.95,
+      "evaluation_reasoning": "Let me walk through this step by step. First, the AI clearly understood the user's question about whether their brother can join the company. It correctly identified the shift in topic and addressed the recruitment of relatives policy, specifically stating that siblings of current employees cannot be hired. This aligns well with the expected answer, which calls for highlighting that the brother can't join the company. \n\nHowever, the expected answer also mentions specifying the position and referencing summarized tables, which the AI response does not address. There is no mention of positions or any tabular summary, nor does it clarify if the restriction applies to all roles or only certain ones. The AI does cite policy numbers and offers to answer further questions, which is helpful and professional, but it also lists unrelated sources (like Employee Leaves and VIP Customer policies) that are not relevant to the recruitment question. This could confuse users or dilute the focus of the answer.\n\nIn terms of clarity, the response is well-structured and easy to read. The tone is friendly and professional, which is appropriate for a recruitment context. A real user would likely find the answer helpful for understanding the policy, but might be left wondering about specifics (e.g., does this apply to all positions, is there any exception, or what about after the employee leaves?). The lack of reference to summarized tables or position details means the answer is not fully complete compared to the expected answer. \n\nOverall, the AI response is accurate and relevant, but misses some completeness and includes a bit of unnecessary information.",
+      "improvement_suggestions": "1. Specify whether the restriction applies to all positions or only certain ones, as the expected answer suggests.\n2. Reference or summarize any relevant tables or documentation if available, to align with the expected answer.\n3. Remove unrelated sources (Employee Leaves, VIP Customer) to keep the answer focused.\n4. Briefly mention what would happen if the employee leaves the company (is the restriction lifted?), to anticipate possible follow-up questions.\n5. Consider explicitly stating 'your brother cannot join the company while you are employed here, regardless of the position.'",
+      "issues_found": [
+        "Did not specify position or reference summarized tables as expected",
+        "Included irrelevant sources (Employee Leaves, VIP Customer)",
+        "Did not clarify if restriction applies to all positions or only some",
+        "Missed opportunity to anticipate follow-up questions (e.g., after employment ends)"
+      ]
+    },
+    {
+      "question": {
+        "category": "EMPLOYEE RELOCATION",
+        "question": "am relocating to another country what will be my allowance?",
+        "expected_answer": "i prefer to provide it as a table",
+        "owner": "Layan",
+        "row_number": 9
+      },
+      "actual_answer": "I see you've changed the topic to relocation and allowances. Let me assist you with that. Great question! Relocating to another country is a big step, and I'd be happy to help you understand your allowance. As an Azadea Group employee, you're eligible for a relocation allowance, which includes economy air travel for you—and if you're Grade 12 or above, for your spouse and up to two children as well. You'll also receive 30 days of free accommodation in an Azadea-owned apartment (unless you're moving to your home country). If you prefer to drive your own car, you'll get an allowance equivalent to the price of the ticket to help cover fuel, depreciation, and toll fees. The allowance is paid in the currency of your destination country, and the exact amount can depend on your grade, family status, and unique circumstances. To get precise figures tailored to your situation, I'd recommend reaching out to your HR representative. If you have more questions about the relocation process or other benefits, feel free to ask—I'm here to help! 📊 Confidence: MEDIUM (70%) 📚 Sources: TRD - 012 - Employee Relocation - P - 16 ⚠️ Note: The answer does not provide the exact allowance amount and lacks specific details that may be critical for your situation. You should contact your HR representative for precise figures and eligibil...",
+      "response_time": 62.86425828933716,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 6.0,
+      "semantic_similarity": 0.6,
+      "completeness_score": 0.5,
+      "relevance_score": 0.7,
+      "evaluation_reasoning": "Let's break this down step by step. First, the AI does understand the general topic: the user is asking about relocation allowances. It provides a reasonably accurate summary of the types of allowances (airfare, accommodation, car allowance, etc.) and mentions that the specifics depend on grade and family status. However, the expected answer was to provide the information as a table, which the AI completely missed. This is a significant gap, as the user explicitly requested a table format, likely for clarity and ease of comparison. The AI's response is verbose and friendly, but it doesn't directly answer the user's core question in the preferred format. It also doesn't provide any actual figures or a breakdown of allowance components, which would be highly useful. Instead, it refers the user to HR for specifics, which, while sometimes necessary, feels like a deflection rather than a helpful answer. There is a bit of extra information (e.g., 'if you prefer to drive your own car...') that could be relevant, but without a structured summary, it's easy to lose track. The tone is professional and empathetic, which is a plus, but the lack of a table and precise details means the answer falls short of being truly helpful. For a user wanting a quick, clear overview (especially in table form), this response would be frustrating and require follow-up.",
+      "improvement_suggestions": "1. Present the information in a table as requested, summarizing key allowance components by grade and family status if possible. 2. Include example figures or ranges, or at least a row/column structure, even if exact numbers can't be given. 3. Keep the explanation concise and focused on the user's request. 4. If referring to HR is necessary, do so after providing as much structured information as possible. 5. Avoid unnecessary filler and ensure the structure matches the user's preferred format.",
+      "issues_found": [
+        "Did not provide information in a table as explicitly requested",
+        "No actual allowance amounts or example figures given",
+        "Too verbose and not structured for easy comparison",
+        "Defers to HR without maximizing the information provided",
+        "Some information is generic and not tailored to the user's grade or situation"
+      ]
+    }
+  ]
+}

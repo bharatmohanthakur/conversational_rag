@@ -1,0 +1,44 @@
+{
+  "timestamp": "20260113_193712",
+  "stats": {
+    "total": 5,
+    "passed": 0,
+    "failed": 0,
+    "errors": 0,
+    "avg_accuracy": 0.0,
+    "avg_response_time": 30.42562174797058
+  },
+  "total_questions": 5,
+  "categories": {
+    "Inurance": {
+      "total": 1,
+      "passed": 0,
+      "failed": 0,
+      "avg_accuracy": 0.0
+    },
+    "maternity Leave": {
+      "total": 1,
+      "passed": 0,
+      "failed": 0,
+      "avg_accuracy": 0.0
+    },
+    "Remote working": {
+      "total": 1,
+      "passed": 0,
+      "failed": 0,
+      "avg_accuracy": 0.0
+    },
+    "Road and Promotion": {
+      "total": 1,
+      "passed": 0,
+      "failed": 0,
+      "avg_accuracy": 0.0
+    },
+    "Comission": {
+      "total": 1,
+      "passed": 0,
+      "failed": 0,
+      "avg_accuracy": 0.0
+    }
+  }
+}

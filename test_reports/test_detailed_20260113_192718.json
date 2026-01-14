@@ -1,0 +1,105 @@
+{
+  "timestamp": "20260113_192718",
+  "stats": {
+    "total": 3,
+    "passed": 0,
+    "failed": 0,
+    "errors": 0,
+    "avg_accuracy": 0.0,
+    "avg_response_time": 34.86369967460632
+  },
+  "results": [
+    {
+      "question": {
+        "category": "Inurance",
+        "question": "does my insurance covers me outside my residence country?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 2
+      },
+      "actual_answer": "<p>You've shifted the conversation from salary-related questions to insurance coverage. Let me help you with your insurance query.</p>\n<p>Great question! I understand how important it is to know whether your insurance has you covered while you're outside your home country. In most cases, if you're traveling for business purposes, you're protected under the company's travel medical insurance plan. However, for personal trips, this coverage usually doesn't apply outside your country of residence. To be sure about the details and any exceptions, I'd recommend checking the travel insurance plan documentation. If you need help finding those details or have more questions about coverage, just let me know—I'm here to help!</p>\n<hr />\n<p>📊 <strong>Confidence:</strong> MEDIUM (60%)\n📚 <strong>Sources:</strong> TRD - 023 - Travel Insurance - B - 3, TRV - 001 - Business Travel - B - 14, FNB - ADM - 001 - Accommodation Contract  Rules - F - 1\n⚠️ <strong>Note:</strong> The answer does not specify coverage details for personal travel and does not integrate source information directly into the answer text. There is also no context provided about the user's specific...</p>\n",
+      "response_time": 32.63000416755676,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "FNB - ADM - 001 - Accommodation Contract  Rules - F - 1.md",
+        "HRD - TRD - 023 - Travel Insurance - B - 3.md",
+        "HRD - TRD - 023 - Travel Insurance - B - 3.md",
+        "HRD - TRD - 023 - Travel Insurance - B - 3.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "maternity Leave",
+        "question": "can i extend my metirnaty leave ?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 3
+      },
+      "actual_answer": "<p>I see you've switched topics from insurance to questions about maternity leave. How can I assist you with your maternity leave extension?</p>\n<p>Great question! I completely understand how important it is to plan your maternity leave, and I'd be happy to help you with the extension process.</p>\n<p>Yes, you can request to extend your maternity leave, but there are a few steps you'll need to follow to make sure everything is approved and in line with company policy.</p>\n<p>Here’s how you can do it:</p>\n<ul>\n<li><strong>Speak with your Line Manager:</strong> Let your Line Manager know as soon as possible that you'd like to extend your maternity leave. Their approval is required for any extension.</li>\n<li><strong>Choose the type of extension:</strong> You have several options, depending on your situation:\n<ul>\n<li>You can use your accumulated annual leave to add more time to your maternity leave.</li>\n<li>If you need additional unpaid time off, you can request unpaid leave for this period.</li>\n<li>If you have a valid medical reason, you can also apply for sick leave by providing a supporting medical certificate.</li>\n</ul>\n</li>\n<li><strong>Submit any required documents:</strong> If you’re requesting sick leave, make sure to provide a medical report.</li>\n</ul>\n<p>Just a quick note: It’s essential to secure your Line Manager’s approval for any changes to your leave. Taking leave without the proper approval could result in disciplinary action or be considered a breach of contract (HRD - GEN - 004 - Maternity and Paternity Leaves - P - <a href=\"http://13.md\">13.md</a>).</p>\n<p>If you have questions about country-specific entitlements or need more detailed guidance, let me know—I'm here to help you navigate this process or provide further information!</p>\n<hr />\n<p>📊 <strong>Confidence:</strong> HIGH (95%)\n📚 <strong>Sources:</strong> GEN - 004 - Maternity and Paternity Leaves - P - 13\n⚠️ <strong>Note:</strong> This answer is based on the HRD - GEN - 004 - Maternity and Paternity Leaves policy. If you are subject to different country-specific laws or company policies, additional requirements or entitlemen...</p>\n",
+      "response_time": 38.859052658081055,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "Remote working",
+        "question": "how can i submit my remote working leave",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 4
+      },
+      "actual_answer": "<p>You've shifted from general leave topics to specifically asking about remote working leave submission.</p>\n<p>Thanks for your question! I can definitely help you with submitting a remote working leave request. Since you're pivoting from leave-related questions, let's focus on the process for remote working leave now.</p>\n<p>To submit your request, you'll need to use the Oracle Applications system. Here’s a quick step-by-step guide:</p>\n<ol>\n<li>Log in to Oracle Applications and go to the main menu.</li>\n<li>Click on the 'View' menu, then select 'Requests' from the dropdown (as shown in the first image).</li>\n<li>In the 'Find Requests' window (second image), choose 'Submit a New Request...'.</li>\n<li>Fill in the required details: select 'Remote Working' as the absence type, set your start and end dates, and add any other necessary information.</li>\n<li>Submit your request. Once you do, the system will automatically forward it to your line manager for approval.</li>\n</ol>\n<p>This process applies to all back-office employees, according to HRD - GEN - 016 - Remote Working - P - <a href=\"http://2.md\">2.md</a>. After submission, your manager will be notified through the HRMS system for any further action.</p>\n<p>If you need help with any of the steps or have questions about your leave status, just let me know—I'm here to support you!</p>\n<hr />\n<p>📊 <strong>Confidence:</strong> HIGH (95%)\n📚 <strong>Sources:</strong> TRD - 020 - Employee Attendance Validation - G - 1, GEN - 016 - Remote Working - P - 2</p>\n",
+      "response_time": 33.10204219818115,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 020 - Employee Attendance Validation - G - 1.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - TRD - 020 - Employee Attendance Validation - G - 1.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    }
+  ]
+}

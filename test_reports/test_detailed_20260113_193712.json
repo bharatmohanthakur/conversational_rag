@@ -1,0 +1,156 @@
+{
+  "timestamp": "20260113_193712",
+  "stats": {
+    "total": 5,
+    "passed": 0,
+    "failed": 0,
+    "errors": 0,
+    "avg_accuracy": 0.0,
+    "avg_response_time": 30.42562174797058
+  },
+  "results": [
+    {
+      "question": {
+        "category": "Inurance",
+        "question": "does my insurance covers me outside my residence country?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 2
+      },
+      "actual_answer": "I see you've switched from questions about leave to insurance coverage. How can I assist you with your insurance inquiry? Great question! I understand it’s important to know where your insurance coverage applies, especially if you’re planning to travel. Your insurance will cover you when you’re outside your residence country, but only if you’re traveling for business purposes. For personal trips abroad, unfortunately, the insurance doesn’t provide coverage. Also, during business travel, coverage is generally limited to emergency medical situations. If you'd like more details about what’s included or how to make a claim while traveling, just let me know—I'm here to help! 📊 Confidence: MEDIUM (60%) 📚 Sources: TRD - 023 - Travel Insurance - B - 3, TRV - 001 - Business Travel - B - 14, FNB - ADM - 001 - Accommodation Contract Rules - F - 1",
+      "response_time": 25.908331871032715,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 023 - Travel Insurance - B - 3.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "FNB - ADM - 001 - Accommodation Contract  Rules - F - 1.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "maternity Leave",
+        "question": "can i extend my metirnaty leave ?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 3
+      },
+      "actual_answer": "I see you've switched topics from insurance to maternity leave. How can I assist you with your maternity leave extension? Great question! Yes, you can request to extend your maternity leave beyond the standard period, but you'll need approval from your Line Manager. Many employees choose to use their accumulated annual leave, request unpaid leave, or, if you have a medical certificate, use sick leave to add some extra time. Just a heads up—it's important to get official approval, as taking additional leave without it could lead to disciplinary action. Policies can vary depending on your country or position, so I'd recommend having a chat with your Line Manager or HR department to explore the options that best fit your situation. If you’d like, I can also share guidance on how to start this process or what documents you might need. Let me know how I can support you! 📊 Confidence: MEDIUM (50%) 📚 Sources: GEN - 004 - Maternity and Paternity Leaves - P - 13",
+      "response_time": 30.879550457000732,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "Remote working",
+        "question": "how can i submit my remote working leave",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 4
+      },
+      "actual_answer": "You've shifted from general leave topics to specifically asking about remote working leave submission. Now shifting over to your question about remote working leave—great question! I'd be happy to guide you through the process. To submit a remote working leave request, you'll need to use the Oracle Applications system. Here’s how you can do it: Log in to Oracle Applications. Go to the 'People' section. From the 'View' menu, select 'Requests.' In the 'Find Requests' window, click on 'Submit a New Request.' Fill in all the required details for your remote working leave (such as absence type, dates, etc.). Once you've completed the form, submit your request. After you submit, your leave request will be sent automatically to your line manager through the HRMS system for approval, as outlined in the HR policy documentation. This process applies to all Back-office Employees, in line with the Remote Working Policy. If you need any help at any step or have questions about what details to enter, just let me know—I'm here to help! 📊 Confidence: MEDIUM (70%) 📚 Sources: TRD - 020 - Employee Attendance Validation - G - 1, GEN - 016 - Remote Working - P - 2 ⚠️ Note: The answer assumes you are a Back-office Employee with access to Oracle Applications and that your organization follows the referenced process. If your situation differs, the steps may not apply. N...",
+      "response_time": 32.182788610458374,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 020 - Employee Attendance Validation - G - 1.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - TRD - 020 - Employee Attendance Validation - G - 1.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "Road and Promotion",
+        "question": "what is road and when am i eligable for it",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 5
+      },
+      "actual_answer": "I see you've shifted from discussing leave policies to asking about 'road' and your eligibility for it. Great question! At AZADEA, &quot;road&quot; refers to the Remote Working Leave policy. This allows eligible back-office employees to work remotely instead of coming into the office in certain situations. You're eligible to apply for remote working leave if your job can be performed away from the office and you meet one of these criteria: You're ill or caring for a direct family member who is unwell You face an emergency travel situation outside your base country You're unable to attend or deliver online training from the office You're required to work during your annual leave Or, you have any other significant reason Eligible employees can work remotely for up to 30 cumulative days per year, as long as these conditions are met. This policy covers all back-office employees. If you need more details or want to review the official guidelines, you can refer to HRD - GEN - 016 - Remote Working - P - 2.md. If you’d like, I can also guide you through the application process or help answer any other questions you might have. 📊 Confidence: HIGH (95%) 📚 Sources: GEN - 016 - Remote Working - P - 2",
+      "response_time": 28.310784578323364,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "Comission",
+        "question": "how to calculate my commision",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 6
+      },
+      "actual_answer": "I see you've switched topics to commission calculation. Let me help you with that. Great question! I'd be happy to help you understand how your commission is calculated at AZADEA. For store employees, commission is typically a percentage of the sales revenue you generate. This applies group-wide to employees in fashion and entertainment stores. To figure out your commission, just multiply your total monthly sales revenue by your commission rate. For example, if you made $10,000 in sales and your commission rate is 2%, your commission would be $200. Just a quick note: the exact percentage can vary depending on your role, store, or even your country. If you're not sure about your specific commission rate, it's a good idea to check your employment contract or reach out to your HR department for clarification. If you have any other questions or need help finding your commission rate, please let me know—I'm here to support you! 📊 Confidence: HIGH (90%) 📚 Sources: TRD - 006 - Commission Scheme for Store Employees - P - 6, FNB - STR - 003 - Cash Operating Manual - FNB Outlets - G - 5, SALES - OFF - 001 - Offline Sales Validation - G - 2, TRD - 003 - Employee Discounts - P - 27 ⚠️ Note: The answer provides a general calculation method but does not specify the exact commission percentage, which may vary by role, store, or country. Please consult your employment contract or HR depar...",
+      "response_time": 34.84665322303772,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "SALES - OFF - 001 - Offline Sales Validation - G - 2.md",
+        "HRD - TRD - 003 - Employee Discounts - P - 27.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md",
+        "FNB - STR - 003 - Cash Operating Manual - FNB Outlets - G - 5.md",
+        "HRD - TRD - 006 - Commission Scheme for Store Employees - P - 6.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    }
+  ]
+}
