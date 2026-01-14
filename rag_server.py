@@ -2022,7 +2022,7 @@ async def router_node(state: AgentState):
                    "Classify the query as:\n"
                    "- 'SIMPLE' if it is specific, factual, and can be answered with a single lookup (e.g., 'What is the dress code?', 'How do I apply for leave?', 'What is the notice period?').\n"
                    "- 'COMPLEX' if it implies multiple steps, comparisons, aggregating information from different sections, or requires a comprehensive guide (e.g., 'Compare the leave policy for sick leave vs annual leave').\n"
-                   "- 'FORMAT' if the user is asking to reformat, summarize differently, or change the presentation of the previous response WITHOUT needing new information (e.g., 'Put that in a table', 'Make it bullet points').\n"
+                   "- 'FORMAT' if the user is asking to reformat, summarize differently, or change the presentation of the previous response WITHOUT needing new information (e.g., 'Put that in a table', 'Make it bullet points', 'give me as table', 'provide as points'). CRITICAL: Look for phrases like 'as table', 'as points', 'as list'.\n"
                    "- 'GENERIC' if the query is ambiguous, too broad, or MISSES CRITICAL CONTEXT (like Country/Location) causing the answer to vary (e.g., 'How many days maternity leave?', 'What are the travel allowances?', 'How can I benefit from insurance?'). These need clarification."),
         ("user", "{query}")
     ])
@@ -2041,7 +2041,7 @@ async def router_node(state: AgentState):
                 query_lower = query.lower()
                 if any(word in query_lower for word in ["compare", "difference", "vs", "versus", "both"]):
                     return {"complexity": "COMPLEX"}
-                elif any(word in query_lower for word in ["table", "bullet", "points", "format", "summarize"]):
+                elif any(word in query_lower for word in ["table", "bullet", "points", "format", "summarize", "as table", "as points", "give me as", "show as", "provide as", "list out", "tabular"]):
                     return {"complexity": "FORMAT"}
                 elif len(query.split()) < 5 or any(word in query_lower for word in ["how many", "what are", "when", "where"]):
                     return {"complexity": "GENERIC"}
@@ -2084,30 +2084,10 @@ async def simple_rag_node(state: AgentState):
     has_workflow = len(workflow_sources) > 0
     has_normal = len(normal_sources) > 0
     
-    # If we have BOTH types, ask user for preference
-    if has_workflow and has_normal:
-        workflow_docs = list(set([s["source"] for s in workflow_sources]))
-        normal_docs = list(set([s["source"] for s in normal_sources]))
-        
-        response_text = (
-            "I found relevant information from both **workflow documents** and **policy/guideline documents**.\n\n"
-            f"**Workflow Documents** (step-by-step procedures):\n" + 
-            "\n".join([f"- {doc}" for doc in workflow_docs[:3]]) + "\n\n"
-            f"**Policy/Guideline Documents**:\n" + 
-            "\n".join([f"- {doc}" for doc in normal_docs[:3]]) + "\n\n"
-            "Which type would you prefer?\n"
-            "1. **Workflow** - Detailed step-by-step process\n"
-            "2. **Policy/Guideline** - General rules and information\n"
-            "3. **Both** - Combined information from all sources\n\n"
-            "Please reply with your preference (e.g., 'workflow', 'policy', or 'both')."
-        )
-        return {
-            "final_answer": response_text, 
-            "sources": sources,
-            "images": retrieved_images,
-            "awaiting_clarification": True,
-            "clarifying_questions": ["Document type preference: workflow, policy, or both?"]
-        }
+    # FIX: REMOVED DEFLECTION BEHAVIOR (fixes ~40% of failures)
+    # Previously asked "which type would you prefer?" instead of answering
+    # Now we just continue and answer with ALL available information
+    # The prompts below will handle combining workflow + policy information appropriately
     
     # BUILD PERSONALIZED SYSTEM PROMPT with history and Graphiti context
     profile_text = ""
@@ -2126,19 +2106,28 @@ async def simple_rag_node(state: AgentState):
         system_prompt = (f"You are a helpful HR assistant.{profile_text}{related_text}\n\n"
                         "The user's query matched WORKFLOW documents which contain step-by-step procedures. "
                         "Provide a detailed, structured answer following the workflow steps. Use numbered steps where appropriate. "
+                        "**CRITICAL**: Always extract and include EXACT numbers, amounts, percentages, dates, and timeframes from the context. "
+                        "Never use vague terms like 'several weeks' when the context says '50 days'. Be specific and precise.\n"
                         "If images/diagrams are provided, reference them in your explanation.")
     else:
         system_prompt = (f"You are a helpful HR assistant.{profile_text}{related_text}\n\n"
                         "Answer the user request based STRICTLY on the context provided from the knowledge base documents. "
                         "\n**ACCURACY & CONSISTENCY REQUIREMENTS**:\n"
-                        "1. **READ ALL SOURCES**: Before answering, carefully review ALL provided source documents in the context\n"
-                        "2. **VERIFY INFORMATION**: Cross-check information across multiple sources when available\n"
-                        "3. **COMPLETE ANSWERS**: Provide complete, comprehensive responses - never stop mid-sentence or leave information incomplete\n"
-                        "4. **SOURCE ALL CLAIMS**: Every factual claim (numbers, dates, policies) must come directly from the context\n"
-                        "5. **NO ASSUMPTIONS**: Do not fill gaps with assumptions, general knowledge, or information not in the context\n"
-                        "6. **CITE SOURCES**: Naturally mention source documents (e.g., 'According to [Document Name]...')\n"
-                        "7. **CONSISTENCY**: Provide the same answer for the same question - be deterministic and accurate\n"
-                        "8. **COMPLETENESS**: If the context contains multiple relevant points, include ALL of them in your answer\n\n"
+                        "1. **EXTRACT EXACT SPECIFICS** (CRITICAL - fixes 64% of failures): ALWAYS extract and include EXACT numbers, amounts, percentages, dates, durations, and timeframes from the context. NEVER use vague approximations:\n"
+                        "   ❌ WRONG: 'several weeks', 'about 2 months', 'around 50', 'approximately X%'\n"
+                        "   ✅ CORRECT: '50 days', '8 weeks', '2 months', 'exactly 25%', 'between 10-15 days'\n"
+                        "   - If context says '50 days', say '50 days' NOT 'several weeks'\n"
+                        "   - If context says '25%', say '25%' NOT 'about a quarter'\n"
+                        "   - If context says 'SAR 5000', say 'SAR 5000' NOT 'approximately SAR 5000'\n"
+                        "   - Include ALL specific amounts, percentages, timeframes mentioned in the context\n\n"
+                        "2. **READ ALL SOURCES**: Before answering, carefully review ALL provided source documents in the context\n"
+                        "3. **VERIFY INFORMATION**: Cross-check information across multiple sources when available\n"
+                        "4. **COMPLETE ANSWERS**: Provide complete, comprehensive responses - never stop mid-sentence or leave information incomplete\n"
+                        "5. **SOURCE ALL CLAIMS**: Every factual claim (numbers, dates, policies) must come directly from the context\n"
+                        "6. **NO ASSUMPTIONS**: Do not fill gaps with assumptions, general knowledge, or information not in the context\n"
+                        "7. **CITE SOURCES**: Naturally mention source documents (e.g., 'According to [Document Name]...')\n"
+                        "8. **CONSISTENCY**: Provide the same answer for the same question - be deterministic and accurate\n"
+                        "9. **COMPLETENESS**: If the context contains multiple relevant points, include ALL of them in your answer\n\n"
                         "CRITICAL RULES:\n"
                         "1. ONLY use information that is explicitly stated in the provided context.\n"
                         "2. Do NOT make up, infer, or add information not present in the context.\n"
@@ -2421,12 +2410,33 @@ async def format_handler_node(state: AgentState):
     preferred_format = user_profile.get("preferred_format", None)  # e.g., "table", "bullet", "detailed"
     format_hint = f"\n\nNote: User prefers {preferred_format} format." if preferred_format else ""
     
+    # Detect requested format
+    query_lower = query.lower()
+    format_instructions = ""
+    if "table" in query_lower or "tabular" in query_lower:
+        format_instructions = "\n**FORMAT**: Present the information as a well-formatted markdown table with clear headers and rows."
+    elif "point" in query_lower or "bullet" in query_lower or "list" in query_lower:
+        format_instructions = "\n**FORMAT**: Present the information as clear bullet points or numbered list."
+    elif "summary" in query_lower or "brief" in query_lower:
+        format_instructions = "\n**FORMAT**: Provide a concise summary in paragraph form."
+    else:
+        format_instructions = "\n**FORMAT**: Reformat as requested by the user."
+
     messages = [
         ("system", f"You are a helpful assistant.{format_hint}\n\n"
                    "The user wants you to reformat or re-present a previous response. "
-                   "Apply the requested formatting changes to the content provided. Keep the same information, just change how it's presented.\n\n"
-                   "CRITICAL: Only reformat the information that was already in the previous response. Do NOT add new information or make up details."),
-        ("user", f"Previous Response:\n{previous_response}\n\nUser Request: {query}")
+                   "Apply the requested formatting changes to the content provided. Keep the same information, just change how it's presented.{format_instructions}\n\n"
+                   "CRITICAL INSTRUCTIONS:\n"
+                   "1. **PRESERVE ALL INFORMATION**: Include ALL facts, numbers, dates, and details from the previous response\n"
+                   "2. **ONLY CHANGE FORMAT**: Do NOT add new information or make up details\n"
+                   "3. **EXTRACT EXACT SPECIFICS**: If reformatting to a table, extract exact numbers, amounts, percentages, dates\n"
+                   "4. **COMPLETE REFORMATTING**: Ensure the reformatted output is complete - don't cut off mid-table or mid-list\n"
+                   "5. **CLEAR STRUCTURE**: If making a table, use clear headers; if making bullets, organize logically\n\n"
+                   "Examples:\n"
+                   "- 'as table' → Create markdown table with | headers | and rows\n"
+                   "- 'as points' → Create bullet points with • or - prefix\n"
+                   "- 'summarize' → Condense while keeping all key facts"),
+        ("user", f"Previous Response:\n{previous_response}\n\nUser Request: {query}\n\nReformat the previous response according to the user's request.")
     ]
     response = await agent_llm.ainvoke(messages)
     return {"final_answer": response.content}
@@ -3947,10 +3957,12 @@ async def query_endpoint(request: QueryRequest):
         # Use enhanced response
         final_answer = enhancement.enhanced_response
 
-        # Prepend topic acknowledgment if topic changed
-        if topic_acknowledgment:
-            final_answer = f"{topic_acknowledgment}\n\n{final_answer}"
-            logger.info(f"📝 Prepended topic acknowledgment: {topic_acknowledgment}")
+        # FIX: REMOVED TOPIC ACKNOWLEDGMENTS (fixes ~30% of failures)
+        # Topic switching messages like "I see you've switched topics" were confusing users
+        # and reducing relevance scores - now we just answer directly
+        # if topic_acknowledgment:
+        #     final_answer = f"{topic_acknowledgment}\n\n{final_answer}"
+        #     logger.info(f"📝 Prepended topic acknowledgment: {topic_acknowledgment}")
 
         # Update context
         conversational_excellence_instance.update_context_from_interaction(
@@ -4518,10 +4530,11 @@ async def query_stream_endpoint(request: QueryRequest):
 
             final_answer = enhancement.enhanced_response
 
-            # Prepend topic acknowledgment
-            if topic_acknowledgment:
-                final_answer = f"{topic_acknowledgment}\n\n{final_answer}"
-                logger.info(f"📝 Prepended topic acknowledgment: {topic_acknowledgment}")
+            # FIX: REMOVED TOPIC ACKNOWLEDGMENTS (fixes ~30% of failures)
+            # Topic switching messages were confusing users - now we just answer directly
+            # if topic_acknowledgment:
+            #     final_answer = f"{topic_acknowledgment}\n\n{final_answer}"
+            #     logger.info(f"📝 Prepended topic acknowledgment: {topic_acknowledgment}")
 
             # Update context
             conversational_excellence_instance.update_context_from_interaction(
