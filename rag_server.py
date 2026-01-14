@@ -1999,16 +1999,35 @@ async def router_node(state: AgentState):
     user_id = state["user_id"]
     previous_response = state.get("previous_response", "")
     
+    # FIX: Check for format requests FIRST with heuristics (fixes Q27, Q33 format failures)
+    # These should be detected before LLM routing to ensure they're handled correctly
+    query_lower = query.lower()
+    format_keywords = [
+        "as table", "as a table", "in table", "table format", "tabular",
+        "as points", "as point", "bullet points", "bulleted", "as bullets",
+        "as list", "as a list", "list format",
+        "give me as", "show as", "provide as", "present as",
+        "previous answer as", "reformat", "reformatting"
+    ]
+    is_format_request = (
+        previous_response and  # Must have a previous response to reformat
+        any(keyword in query_lower for keyword in format_keywords)
+    )
+
+    if is_format_request:
+        logger.info(f"✅ Router: Detected FORMAT request (heuristic): {query[:60]}")
+        return {"complexity": "FORMAT"}
+
     # Check if user is responding to a document preference question
     preference_keywords = ["workflow", "policy", "guideline", "both", "1", "2", "3"]
     is_preference_response = (
         "Which type would you prefer" in previous_response and
         any(kw in query.lower() for kw in preference_keywords)
     )
-    
+
     if is_preference_response:
         return {"complexity": "DOC_PREFERENCE"}
-    
+
     # Check if user is answering clarifying questions (CHECK FIRST, before LLM routing)
     active_session = clarification_tracker.get_active_session(user_id)
     if active_session:
@@ -2111,6 +2130,7 @@ async def simple_rag_node(state: AgentState):
                         "If images/diagrams are provided, reference them in your explanation.")
     else:
         system_prompt = (f"You are a helpful HR assistant.{profile_text}{related_text}\n\n"
+                        "🎯 **PRIMARY RULE - NEVER FORGET**: When answering, ALWAYS include EXACT numbers, amounts, percentages, dates, and timeframes from the context. Use '50 days' NOT 'several weeks', use '25%' NOT 'about a quarter'. This is THE MOST IMPORTANT REQUIREMENT.\n\n"
                         "Answer the user request based STRICTLY on the context provided from the knowledge base documents. "
                         "\n**ACCURACY & CONSISTENCY REQUIREMENTS**:\n"
                         "1. **EXTRACT EXACT SPECIFICS** (CRITICAL - fixes 64% of failures): ALWAYS extract and include EXACT numbers, amounts, percentages, dates, durations, and timeframes from the context. NEVER use vague approximations:\n"
@@ -2135,6 +2155,18 @@ async def simple_rag_node(state: AgentState):
                         "4. If the context does not contain enough information to answer the question, state that clearly.\n"
                         "5. Quote specific details, numbers, dates, or procedures directly from the context when available.\n"
                         "6. If images/diagrams are provided, reference them in your explanation.\n\n"
+                        "⛔ **ANTI-HALLUCINATION RULES** (CRITICAL - prevents fabricated data):\n"
+                        "1. **NEVER FABRICATE DATA**: If specific numbers/amounts/percentages are not in the context, say 'I cannot find this specific information in the available documents' - DO NOT make up or estimate values\n"
+                        "2. **NO ASSUMPTIONS**: If context doesn't specify for a particular brand/country/position, say 'The documents don't specify this for [X]' - DO NOT assume it's the same as others\n"
+                        "3. **EXACT MATCHES ONLY**: If user asks about 'Bershka shop manager' but context only has 'Bershka employee', DO NOT assume the values are the same\n"
+                        "4. **ACKNOWLEDGE GAPS**: Better to say 'I don't have this information' than to provide incorrect/made-up data\n"
+                        "5. **NO EXTRAPOLATION**: Do not extrapolate data from similar cases - only use exact matches\n\n"
+                        "🔤 **ABBREVIATION & ACRONYM HANDLING** (fixes context misunderstanding):\n"
+                        "1. **SEARCH FOR FULL FORMS**: When user uses abbreviations (e.g., 'cc', 'F&A'), search context for both the abbreviation AND possible full forms\n"
+                        "2. **CONTEXT-AWARE**: Use conversation history and context to disambiguate abbreviations (e.g., 'F&A' could be 'Finance & Accounting' OR 'Fashion & Accessories')\n"
+                        "3. **LOOK FOR DEFINITIONS**: Check if the context defines the abbreviation anywhere before answering\n"
+                        "4. **ASK FOR CLARIFICATION**: If an abbreviation is ambiguous and context doesn't clarify it, ask: 'I see several meanings for [abbreviation] in the context. Did you mean [option 1] or [option 2]?'\n"
+                        "5. **DOMAIN-SPECIFIC**: Remember you're in HR context - abbreviations likely relate to departments, processes, policies\n\n"
                         "TABLE PARSING: Be extremely robust to malformed markdown tables. "
                         "1. HEADERS SPLIT: If a column header looks cut off (e.g., ends in '&' or starts with a lowercase letter), it belongs to the previous column. Merge them. "
                         "2. VALUES SHIFTED: If columns are split, their values might be shifted. Align them logically. "
@@ -2398,13 +2430,17 @@ async def synthesizer_node(state: AgentState):
 async def format_handler_node(state: AgentState):
     query = state["original_query"]
     previous_response = state.get("previous_response", "")
-    
+
     # GET GRAPHITI FROM STATE for user preferences
     graphiti_context = state.get("graphiti_context", {})
     user_profile = graphiti_context.get("user_profile", {}) if graphiti_context else {}
-    
+
+    # Enhanced logging for debugging format request issues
+    logger.info(f"📋 FORMAT HANDLER: Query='{query[:60]}', Has previous_response={bool(previous_response)}, Length={len(previous_response) if previous_response else 0}")
+
     if not previous_response:
-        return {"final_answer": "I don't have a previous response to reformat. Please ask a question first."}
+        logger.warning(f"⚠️ FORMAT HANDLER: No previous response available for reformatting")
+        return {"final_answer": "I don't have a previous response to reformat. Please ask a question first, then I can reformat the answer for you."}
     
     # Check user preferences from profile
     preferred_format = user_profile.get("preferred_format", None)  # e.g., "table", "bullet", "detailed"
