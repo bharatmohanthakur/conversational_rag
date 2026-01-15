@@ -46,7 +46,7 @@ from self_evaluator import SelfEvaluator, TerminationDecision, TerminationReason
 from adaptive_retrieval import AdaptiveRetriever
 from answer_quality_gate import AnswerQualityGate
 from conversation_summarizer import ConversationSummarizer
-from contextual_compressor import ContextualCompressor
+# REMOVED: from contextual_compressor import ContextualCompressor  # Compression removed for better accuracy
 from reranker import Reranker
 from corrective_rag import CorrectiveRAG
 from general_query_handler import GeneralQueryHandler, QueryType
@@ -216,7 +216,8 @@ def get_enhanced_components():
         _self_evaluator = SelfEvaluator(aoai_client)
         _quality_gate = AnswerQualityGate(_self_evaluator)
         # Initialize RAG technique modules
-        _contextual_compressor = ContextualCompressor(aoai_client, deployment_name=AZURE_CHAT_DEPLOYMENT)
+        # REMOVED: _contextual_compressor = ContextualCompressor(aoai_client, deployment_name=AZURE_CHAT_DEPLOYMENT)  # Compression disabled
+        _contextual_compressor = None  # Disabled - use full context for better accuracy
         _reranker = Reranker(aoai_client, deployment_name=AZURE_CHAT_DEPLOYMENT)
         _corrective_rag = CorrectiveRAG(aoai_client, deployment_name=AZURE_CHAT_DEPLOYMENT)
         # Initialize general query handler for conversational queries
@@ -1683,15 +1684,11 @@ async def _retrieve_single_query(query: str, user_id: str, use_advanced_rag: boo
                 # Still filter irrelevant content if present (even for good quality)
                 if evaluation.irrelevant_parts:
                     initial_context = corrective_rag.filter_irrelevant(initial_context, evaluation.irrelevant_parts)
-        
-        # 9. Apply contextual compression if context is too long
-        if use_advanced_rag and contextual_compressor and contextual_compressor.should_compress(initial_context):
-            compressed = contextual_compressor.compress(initial_context, query)
-            context = compressed.content
-            logger.info(f"Context compressed: {compressed.compression_ratio:.2%}")
-        else:
-            context = initial_context
-        
+
+        # 9. REMOVED: Contextual compression - use full context for better accuracy
+        # Compression was removing important details needed for precise answers
+        context = initial_context
+
         return {"context": context, "sources": sources, "images": retrieved_images}
         
     except Exception as e:
