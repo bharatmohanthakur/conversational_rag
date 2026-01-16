@@ -12,6 +12,7 @@ Features:
 """
 
 import os
+import contextvars
 import sys
 import json
 import asyncio
@@ -217,7 +218,8 @@ def get_enhanced_components():
         _quality_gate = AnswerQualityGate(_self_evaluator)
         # Initialize RAG technique modules
         _contextual_compressor = ContextualCompressor(aoai_client, deployment_name=AZURE_CHAT_DEPLOYMENT)
-        _reranker = Reranker(aoai_client, deployment_name=AZURE_CHAT_DEPLOYMENT)
+        # Set top_k to 10 to return all reranked docs (we limit input to 10, then take top 7 after)
+        _reranker = Reranker(aoai_client, deployment_name=AZURE_CHAT_DEPLOYMENT, top_k=10)
         _corrective_rag = CorrectiveRAG(aoai_client, deployment_name=AZURE_CHAT_DEPLOYMENT)
         # Initialize general query handler for conversational queries
         _general_query_handler = GeneralQueryHandler(
@@ -300,6 +302,19 @@ def get_enhanced_components():
 # ---------------------------------------------------------------------
 graphiti_instance: Optional[Graphiti] = None
 graphiti_lock = asyncio.Lock()
+graphiti_trace_var = contextvars.ContextVar("graphiti_trace", default=None)
+
+
+def _update_graphiti_trace(call_type: str, elapsed_sec: float) -> None:
+    trace = graphiti_trace_var.get()
+    if not trace:
+        return
+    trace["count"] += 1
+    trace["elapsed_sec"] += elapsed_sec
+    by_type = trace.setdefault("by_type", {})
+    entry = by_type.setdefault(call_type, {"count": 0, "elapsed_sec": 0.0})
+    entry["count"] += 1
+    entry["elapsed_sec"] += elapsed_sec
 
 async def get_graphiti() -> Optional[Graphiti]:
     """Get or initialize the Graphiti instance."""
@@ -400,12 +415,15 @@ async def search_graphiti_memory(query: str, num_results: int = 5, memory_types:
 
     circuit = get_graphiti_circuit()
     try:
+        start_time = datetime.now()
         results = await circuit.acall(
             graphiti.search,
             query,
             num_results=num_results * 2,  # Get more results for filtering by type
             group_ids=[GRAPHITI_GROUP_ID],  # Filter by group_id for data isolation
         )
+        elapsed_sec = (datetime.now() - start_time).total_seconds()
+        _update_graphiti_trace("search", elapsed_sec)
         facts = []
         for r in results:
             fact_text = getattr(r, "fact", "")
@@ -511,6 +529,7 @@ This is an episodic conversation memory."""
             source_desc = f"RAG conversation with user {user_id}"
             episode_name = f"conversation_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
+        start_time = datetime.now()
         await graphiti.add_episode(
             name=episode_name,
             episode_body=episode_content,
@@ -519,6 +538,8 @@ This is an episodic conversation memory."""
             reference_time=datetime.now(timezone.utc),
             group_id=GRAPHITI_GROUP_ID,  # Assign to group_id for isolation
         )
+        elapsed_sec = (datetime.now() - start_time).total_seconds()
+        _update_graphiti_trace(f"save:{memory_type}", elapsed_sec)
         logger.info(f"💾 Saved {memory_type} memory to Graphiti (group_id={GRAPHITI_GROUP_ID})")
         return True
     except Exception as e:
@@ -1153,6 +1174,8 @@ async def query_backup_endpoint(request: QueryRequest):
     # Generate unique request ID for tracking
     request_id = str(uuid.uuid4())[:8]
     start_time = datetime.now()
+    graphiti_trace = {"count": 0, "elapsed_sec": 0.0, "by_type": {}}
+    graphiti_token = graphiti_trace_var.set(graphiti_trace)
     
     try:
         query_text = request.query.strip()
@@ -1294,7 +1317,7 @@ async def query_backup_endpoint(request: QueryRequest):
             model=AZURE_CHAT_DEPLOYMENT,
             messages=messages,
             temperature=0.0,
-            max_tokens=3000,  # Increased to prevent answer truncation and ensure completeness
+            max_tokens=10000,  # Increased to prevent answer truncation and ensure completeness
         )
         llm_elapsed = (datetime.now() - llm_start).total_seconds()
         
@@ -1430,6 +1453,57 @@ async def run_search_for_deep_agent(query: str, user_id: str, use_advanced_rag: 
         return {"context": f"Error searching knowledge base for '{query}': {str(e)}", "sources": [], "images": []}
 
 
+async def _retrieve_complete_document(source_file: str) -> str:
+    """
+    Load complete document directly from markdown files folder.
+    This helps with structured content like process controls that get split across chunks.
+    
+    Args:
+        source_file: Source file name to retrieve (e.g., "ABS - SPD - 006 - Import Shipment Freight - W -1.md")
+        
+    Returns:
+        Complete document text
+    """
+    try:
+        import os
+        from pathlib import Path
+        
+        # Try multiple possible paths for markdown files
+        possible_paths = [
+            "/home/admincsp/multimodal-rag/azadea/md_out_data_multimodal",
+            "/home/admincsp/multimodal-rag/azadea/md_out_data",
+            "./md_out_data_multimodal",
+            "./md_out_data",
+            "./md_out"
+        ]
+        
+        doc_path = None
+        for base_path in possible_paths:
+            full_path = os.path.join(base_path, source_file)
+            if os.path.exists(full_path):
+                doc_path = full_path
+                break
+        
+        if not doc_path:
+            logger.warning(f"Document file not found: {source_file} in any of the search paths")
+            return ""
+        
+        # Read the complete document file (run in executor to avoid blocking)
+        loop = asyncio.get_event_loop()
+        def read_file():
+            with open(doc_path, 'r', encoding='utf-8', errors='ignore') as f:
+                return f.read()
+        
+        complete_doc = await loop.run_in_executor(None, read_file)
+        
+        logger.info(f"📄 Loaded complete document '{source_file}': {len(complete_doc)} chars from {doc_path}")
+        return complete_doc
+        
+    except Exception as e:
+        logger.warning(f"Failed to load complete document '{source_file}': {e}")
+        return ""
+
+
 async def _retrieve_single_query(query: str, user_id: str, use_advanced_rag: bool = True, correction_depth: int = 0) -> Dict[str, Any]:
     """
     Internal function to retrieve for a single query.
@@ -1442,16 +1516,22 @@ async def _retrieve_single_query(query: str, user_id: str, use_advanced_rag: boo
         correction_depth: Depth of correction recursion (max 1 to prevent infinite loops)
     """
     sources = []
+    retrieval_timings = {}
+    retrieval_start = datetime.now()
+    
     try:
         from qdrant_client import models as qm
         import numpy as np
         
         # 1. Embed the query (synchronous, fast)
+        t0 = datetime.now()
         rag_impl.embed_dense_azure([query])  # warmth
         dense_q = rag_impl.embed_dense_azure([query])[0]
         sparse_q = rag_impl.build_sparse_query_vector(query)
+        retrieval_timings["embed"] = (datetime.now() - t0).total_seconds()
         
         # 2. Run Qdrant search and Graphiti search in PARALLEL
+        t0 = datetime.now()
         circuit = get_qdrant_circuit()
         logger.info(f"🔍 Starting parallel Qdrant + Graphiti search for query: {query[:50]}")
         
@@ -1495,6 +1575,7 @@ async def _retrieve_single_query(query: str, user_id: str, use_advanced_rag: boo
             graphiti_search(),
             return_exceptions=False
         )
+        retrieval_timings["parallel_search"] = (datetime.now() - t0).total_seconds()
         
         content_search, qdrant_error = qdrant_result
         facts, graphiti_error = graphiti_result
@@ -1546,10 +1627,12 @@ async def _retrieve_single_query(query: str, user_id: str, use_advanced_rag: boo
                     match_score = sum(1 for word in query_lower.split() if word in fname_lower)
                     filename_scores[fname] = match_score * 0.1  # Scale to [0, ~1]
         
-        # 4. Prepare documents for reranking (if enabled)
+        # 4. Prepare documents for reranking (if enabled) - Limit to top 10 for reranking
         documents_for_rerank = []
         original_scores = []
-        for p in content_search.points:
+        # Limit to top 10 documents for reranking to reduce token usage
+        top_docs_for_rerank = min(10, len(content_search.points))
+        for p in content_search.points[:top_docs_for_rerank]:
             pl = p.payload or {}
             src_file = pl.get('source_file', 'unknown')
             content_score = p.score or 0
@@ -1568,6 +1651,7 @@ async def _retrieve_single_query(query: str, user_id: str, use_advanced_rag: boo
             original_scores.append(combined_score)
         
         # 5. Apply reranking if enabled (run in parallel with document processing prep)
+        t0 = datetime.now()
         if use_advanced_rag and reranker and len(documents_for_rerank) > 0:
             # Run reranking in executor to not block
             loop = asyncio.get_event_loop()
@@ -1582,35 +1666,68 @@ async def _retrieve_single_query(query: str, user_id: str, use_advanced_rag: boo
             ranked_results = list(zip(original_scores, documents_for_rerank))
             ranked_results.sort(key=lambda x: x[0], reverse=True)
             top_results = [{"content": doc["content"], "metadata": doc["metadata"], "original_score": score, "rerank_score": score, "final_score": score, "rank": i+1} for i, (score, doc) in enumerate(ranked_results[:7])]
+        retrieval_timings["rerank"] = (datetime.now() - t0).total_seconds()
         
-        # 6. Build output from ranked results
-        docs_text = ""
+        # 6. Build output from ranked results AND retrieve complete documents for top 7 in parallel
         retrieved_images = []
-        context_chunks = []
+        complete_docs_text = ""  # Initialize for complete documents
+        top_source_files = set()  # Initialize for top source files
         
+        # Get unique source files from top 7 for complete document retrieval
+        for ranked_doc in top_results:
+            if hasattr(ranked_doc, 'metadata'):
+                src_file = ranked_doc.metadata.get('source_file', 'unknown')
+            else:
+                src_file = ranked_doc.get("metadata", {}).get('source_file', 'unknown')
+            if src_file and src_file != 'unknown':
+                top_source_files.add(src_file)
+        
+        # Retrieve complete documents for top 7 in parallel (if we have top source files)
+        t0 = datetime.now()
+        if top_source_files:
+            logger.info(f"📚 Retrieving complete documents for top {len(top_source_files)} ranked documents in parallel")
+            complete_doc_tasks = [_retrieve_complete_document(src_file) for src_file in top_source_files]
+            complete_documents = await asyncio.gather(*complete_doc_tasks, return_exceptions=True)
+            
+            # Create mapping of source_file -> complete document
+            complete_docs_map = {}
+            for src_file, complete_doc in zip(top_source_files, complete_documents):
+                if isinstance(complete_doc, Exception):
+                    logger.warning(f"Error retrieving complete document for {src_file}: {complete_doc}")
+                    complete_docs_map[src_file] = ""
+                else:
+                    complete_docs_map[src_file] = complete_doc
+            
+            # Add complete documents to context (for top 7 ranked documents)
+            for src_file in top_source_files:
+                complete_doc = complete_docs_map.get(src_file, "")
+                if complete_doc:
+                    # Use full document content without truncation
+                    complete_docs_text += f"\n\n--- COMPLETE DOCUMENT: {src_file} ---\n{complete_doc}"
+            
+            if complete_docs_text:
+                logger.info(f"✅ Added complete documents context: {len(complete_docs_text)} chars from {len(top_source_files)} documents")
+        retrieval_timings["complete_docs"] = (datetime.now() - t0).total_seconds()
+        
+        # Build sources list from ranked results (for metadata only, not for context)
         for ranked_doc in top_results:
             # Handle both RankedDocument objects and dicts
             if hasattr(ranked_doc, 'content'):
                 # RankedDocument object
-                doc_content = ranked_doc.content
                 doc_metadata = ranked_doc.metadata
                 final_score = ranked_doc.final_score
             else:
                 # Dict format
-                doc_content = ranked_doc.get("content", "")
                 doc_metadata = ranked_doc.get("metadata", {})
                 final_score = ranked_doc.get("final_score", 0.5)
             
             src_file = doc_metadata.get('source_file', 'unknown')
-            text_snippet = doc_content[:600]
-            context_chunks.append(text_snippet)
-            docs_text += f"\n- [{src_file}]: {text_snippet}..."
             
             sources.append({
                 "id": doc_metadata.get('id', ''),
                 "score": round(final_score, 4),
                 "source": src_file,
-                "text_snippet": text_snippet[:200],
+                "text_snippet": "",  # No chunk snippet, using complete documents only
                 "has_images": doc_metadata.get("has_images", False)
             })
             
@@ -1627,12 +1744,17 @@ async def _retrieve_single_query(query: str, user_id: str, use_advanced_rag: boo
         # 7. Graphiti (already retrieved in parallel above, just format it)
         facts_text = "\n".join([f"- {f.get('fact')}" for f in facts])
         
-        # Build initial context
-        initial_context = f"**Context for '{query}':**\n\n**Documents:**{docs_text}\n\n**Memory Facts:**\n{facts_text}"
+        # Build initial context with ONLY complete documents (no chunk-based context)
+        if complete_docs_text:
+            initial_context = f"**Context for '{query}':**\n\n**Complete Documents (Top {len(top_source_files)} Ranked):**{complete_docs_text}\n\n**Memory Facts:**\n{facts_text}"
+        else:
+            # Fallback: if no complete documents, use a minimal context
+            initial_context = f"**Context for '{query}':**\n\n**Note**: No complete documents retrieved.\n\n**Memory Facts:**\n{facts_text}"
         
         # 8. Apply Corrective RAG if enabled (only once to prevent infinite loops)
         # Run evaluation in executor to not block
         # Skip corrective RAG if correction_depth > 0 (prevents recursive corrections and turn 3 corrections)
+        t0 = datetime.now()
         if use_advanced_rag and corrective_rag and correction_depth == 0:
             loop = asyncio.get_event_loop()
             evaluation = await loop.run_in_executor(
@@ -1653,8 +1775,13 @@ async def _retrieve_single_query(query: str, user_id: str, use_advanced_rag: boo
                 if evaluation.irrelevant_parts:
                     initial_context = corrective_rag.filter_irrelevant(initial_context, evaluation.irrelevant_parts)
                 
-                # Attempt re-retrieval with refined queries if available
-                if evaluation.refined_queries and len(evaluation.gaps) > 0:
+                # Skip re-retrieval if we already have complete documents (complete docs should be comprehensive)
+                # Only re-retrieve if we don't have complete documents or if quality is extremely poor
+                has_complete_docs = bool(complete_docs_text and len(complete_docs_text) > 1000)
+                should_reretrieve = not has_complete_docs or (evaluation.quality.value == "poor" and evaluation.relevance_score < 0.2 and evaluation.completeness_score < 0.2)
+                
+                # Attempt re-retrieval with refined queries if available and conditions are met
+                if should_reretrieve and evaluation.refined_queries and len(evaluation.gaps) > 0:
                     logger.info(f"Attempting re-retrieval with refined query: {evaluation.refined_queries[0]}")
                     try:
                         # Use a shorter timeout for re-retrieval and disable advanced RAG to prevent recursion
@@ -1672,6 +1799,8 @@ async def _retrieve_single_query(query: str, user_id: str, use_advanced_rag: boo
                         logger.warning("Re-retrieval timed out, proceeding with original context")
                     except Exception as e:
                         logger.warning(f"Re-retrieval failed: {e}, proceeding with original context")
+                elif has_complete_docs:
+                    logger.info(f"⏭️  Skipping re-retrieval: complete documents already available ({len(complete_docs_text)} chars), proceeding with existing context")
             else:
                 # Quality is good or excellent - no correction needed
                 # Log gaps for informational purposes only (minor gaps are normal even for good quality)
@@ -1684,13 +1813,22 @@ async def _retrieve_single_query(query: str, user_id: str, use_advanced_rag: boo
                 if evaluation.irrelevant_parts:
                     initial_context = corrective_rag.filter_irrelevant(initial_context, evaluation.irrelevant_parts)
         
+        retrieval_timings["corrective_rag"] = (datetime.now() - t0).total_seconds()
+        
         # 9. Apply contextual compression if context is too long
+        t0 = datetime.now()
         if use_advanced_rag and contextual_compressor and contextual_compressor.should_compress(initial_context):
             compressed = contextual_compressor.compress(initial_context, query)
             context = compressed.content
             logger.info(f"Context compressed: {compressed.compression_ratio:.2%}")
         else:
             context = initial_context
+        retrieval_timings["compression"] = (datetime.now() - t0).total_seconds()
+        
+        # Log retrieval timing profile
+        retrieval_timings["total"] = (datetime.now() - retrieval_start).total_seconds()
+        timings_str = ", ".join([f"{k}={v:.3f}s" for k, v in retrieval_timings.items()])
+        logger.info(f"⏱️ RETRIEVAL_TIMING: {timings_str}")
         
         return {"context": context, "sources": sources, "images": retrieved_images}
         
@@ -1705,7 +1843,7 @@ agent_llm = AzureChatOpenAI(
     azure_endpoint=AZURE_OPENAI_ENDPOINT,
     api_key=AZURE_OPENAI_API_KEY,
     temperature=0,
-    max_tokens=3000  # Increased to prevent answer truncation
+    max_tokens=10000  # Increased to prevent answer truncation and allow comprehensive answers
 )
 
 # --- State Definition ---
@@ -2368,6 +2506,18 @@ CRITICAL RULES:
 async def executor_node(state: AgentState):
     sub_queries = state["sub_queries"]
     user_id = state["user_id"]
+
+    # De-duplicate sub-queries while preserving order to avoid redundant work
+    deduped_sub_queries = []
+    seen_sub_queries = set()
+    for q in sub_queries:
+        key = q.strip().lower()
+        if key and key not in seen_sub_queries:
+            deduped_sub_queries.append(q)
+            seen_sub_queries.add(key)
+    if len(deduped_sub_queries) != len(sub_queries):
+        logger.info(f"De-duplicated sub-queries: {len(sub_queries)} -> {len(deduped_sub_queries)}")
+    sub_queries = deduped_sub_queries
 
     # Run all sub-query searches in parallel for maximum performance
     logger.info(f"Executing {len(sub_queries)} sub-queries in parallel")
@@ -3675,6 +3825,11 @@ async def query_endpoint(request: QueryRequest):
     """
     request_id = str(uuid.uuid4())[:8]
     start_time = datetime.now()
+    graphiti_trace = {"count": 0, "elapsed_sec": 0.0, "by_type": {}}
+    graphiti_token = graphiti_trace_var.set(graphiti_trace)
+    
+    # Timing dict for profiling
+    timings = {}
     
     try:
         query_text = request.query.strip()
@@ -3683,6 +3838,7 @@ async def query_endpoint(request: QueryRequest):
         log_request(request_id, "🤖 QUERY_START", {"query": query_text})
 
         # Get enhanced components including general query handler and optimization modules
+        t0 = datetime.now()
         components = get_enhanced_components()
         # Unpack: conv_manager, clarification_tracker, conversation_summarizer, self_evaluator,
         #         quality_gate, adaptive_retriever, contextual_compressor,
@@ -3698,16 +3854,21 @@ async def query_endpoint(request: QueryRequest):
         unified_clarification_handler_instance = components[15]
         llm_context_classifier_instance = components[16] if len(components) > 16 else None
         llm_classifier_instance = components[17] if len(components) > 17 else None
+        timings["1_components"] = (datetime.now() - t0).total_seconds()
 
         # Get conversation history for context-aware classification
+        t0 = datetime.now()
         history = get_user_history(user_id)
+        timings["2_history"] = (datetime.now() - t0).total_seconds()
 
         # ============================================================================
         # BEST PRACTICE: Pre-query Graphiti Context Retrieval
         # ============================================================================
         # Retrieve user context from Graphiti BEFORE processing query
         # This provides: user profile, preferences, related conversations, temporal flow
+        t0 = datetime.now()
         graphiti_context = await enhance_query_with_graphiti_context(query_text, user_id, history)
+        timings["3_graphiti_context"] = (datetime.now() - t0).total_seconds()
 
         # Log Graphiti context retrieval
         logger.info(f"🚀 Graphiti context: profile={graphiti_context['context_summary']['has_profile']}, "
@@ -3719,6 +3880,7 @@ async def query_endpoint(request: QueryRequest):
         # ============================================================================
 
         # 1. Extract and remember user context (role, country, department) - enhanced with Graphiti
+        t0 = datetime.now()
         user_profile_tracker_instance.update_from_query(
             user_id=user_id,
             query=query_text,
@@ -3729,11 +3891,13 @@ async def query_endpoint(request: QueryRequest):
         # Merge Graphiti profile with local tracker profile
         if graphiti_context.get('user_profile'):
             user_profile.update(graphiti_context['user_profile'])
+        timings["4_user_profile"] = (datetime.now() - t0).total_seconds()
 
         logger.info(f"👤 User profile for {user_id}: {user_profile}")
 
         # 2. Detect topic changes for smooth transitions
         # BUT: Use LLM to intelligently determine if user is answering a clarification
+        t0 = datetime.now()
         topic_acknowledgment = None
         
         # Check if there's an active clarification session
@@ -3785,15 +3949,18 @@ async def query_endpoint(request: QueryRequest):
         # 3. Update conversation state machine
         conversation_state_machine_instance.transition_to_answering(user_id)
         current_state = conversation_state_machine_instance.get_state(user_id)
+        timings["5_topic_detection"] = (datetime.now() - t0).total_seconds()
         logger.info(f"🎯 Conversation state: {current_state}")
 
         # === NEW: Check if this is a general conversational query (not knowledge-based) ===
         # Use LLM-based classification instead of hardcoded patterns
+        t0 = datetime.now()
         general_response = general_query_handler_instance.handle_query(
             query=query_text,
             conversation_history=history,
             confidence_threshold=0.7
         )
+        timings["6_general_handler"] = (datetime.now() - t0).total_seconds()
 
         if general_response is not None:
             # This is a general conversational query - respond directly without RAG
@@ -3833,6 +4000,7 @@ async def query_endpoint(request: QueryRequest):
             )
 
         # === If not general query, proceed with normal RAG flow ===
+        t0 = datetime.now()
         log_request(request_id, "🤖 DEEP_AGENT_START", {"query": query_text})
 
         # Check for active clarification session FIRST (before rewriting)
@@ -3854,6 +4022,7 @@ async def query_endpoint(request: QueryRequest):
             # Normal flow - rewrite query with history
             rewritten_query = rewrite_query_with_history(history, query_text, user_id)
         
+        timings["7_query_rewrite"] = (datetime.now() - t0).total_seconds()
         if rewritten_query != query_text:
             log_request(request_id, "🔄 DEEP_QUERY_REWRITE", {
                 "original": query_text,
@@ -3906,7 +4075,9 @@ async def query_endpoint(request: QueryRequest):
         }
         
         # Invoke LangGraph
+        t0 = datetime.now()
         result = await deep_agent_app.ainvoke(initial_state)
+        timings["8_langgraph"] = (datetime.now() - t0).total_seconds()
         answer_text = result.get("final_answer", "No answer generated.")
         complexity = result.get("complexity", "UNKNOWN")
         
@@ -3931,6 +4102,10 @@ async def query_endpoint(request: QueryRequest):
             "sub_queries": len(result.get("sub_queries", [])),
             "response_length": len(answer_text)
         })
+        
+        # Log detailed timings for profiling
+        timings_rounded = {k: round(v, 3) for k, v in timings.items()}
+        log_request(request_id, "⏱️ TIMING_PROFILE", timings_rounded)
 
         # Update persistent conversation history
         # Mark new questions (not clarification responses) as original questions
@@ -3948,6 +4123,7 @@ async def query_endpoint(request: QueryRequest):
         conv_manager.add_message(user_id, "user", query_text, metadata)
 
         # Assess answer quality using LLM classifier (zero hardcoding approach)
+        t0 = datetime.now()
         sources = result.get("sources", [])
         
         # Build context string from sources for confidence assessment
@@ -3975,6 +4151,7 @@ async def query_endpoint(request: QueryRequest):
                 logger.error(f"Error in LLM confidence assessment: {e}")
                 # Fallback to basic confidence
                 confidence_result = None
+        timings["9_confidence"] = (datetime.now() - t0).total_seconds()
         
         # Fallback to AnswerQuality if LLM classifier not available or failed
         if confidence_result is None:
@@ -4002,6 +4179,7 @@ async def query_endpoint(request: QueryRequest):
             )
 
         # === NEW: Enhance response for natural conversation ===
+        t0 = datetime.now()
         # Get conversation context
         conv_context = conversational_excellence_instance.get_or_create_context(
             user_id=user_id,
@@ -4022,6 +4200,7 @@ async def query_endpoint(request: QueryRequest):
 
         # Use enhanced response
         final_answer = enhancement.enhanced_response
+        timings["10_enhancement"] = (datetime.now() - t0).total_seconds()
 
         # FIX: REMOVED TOPIC ACKNOWLEDGMENTS (fixes ~30% of failures)
         # Topic switching messages like "I see you've switched topics" were confusing users
@@ -4216,6 +4395,19 @@ async def query_endpoint(request: QueryRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        trace = graphiti_trace_var.get()
+        if trace is not None:
+            by_type = {
+                k: {"count": v["count"], "elapsed_sec": round(v["elapsed_sec"], 3)}
+                for k, v in trace.get("by_type", {}).items()
+            }
+            log_request(request_id, "🧠 GRAPHITI_SUMMARY", {
+                "calls": trace.get("count", 0),
+                "elapsed_sec": round(trace.get("elapsed_sec", 0.0), 3),
+                "by_type": by_type
+            })
+        graphiti_trace_var.reset(graphiti_token)
 
 
 # ---------------------------------------------------------------------
@@ -4275,6 +4467,8 @@ async def query_stream_endpoint(request: QueryRequest):
     async def generate() -> AsyncGenerator[str, None]:
         request_id = str(uuid.uuid4())[:8]
         start_time = datetime.now()
+        graphiti_trace = {"count": 0, "elapsed_sec": 0.0, "by_type": {}}
+        graphiti_token = graphiti_trace_var.set(graphiti_trace)
 
         try:
             query_text = request.query.strip()
@@ -4459,6 +4653,12 @@ async def query_stream_endpoint(request: QueryRequest):
                     clarification_tracker.abandon_session(user_id)
                 rewritten_query = rewrite_query_with_history(history, query_text, user_id)
 
+            if rewritten_query != query_text:
+                log_request(request_id, "🔄 DEEP_QUERY_REWRITE", {
+                    "original": query_text,
+                    "rewritten": rewritten_query
+                })
+
             # Extract previous response
             previous_response = ""
             original_user_query = ""
@@ -4502,6 +4702,16 @@ async def query_stream_endpoint(request: QueryRequest):
             # Invoke LangGraph - this is where the heavy lifting happens
             # The "🔍 Searching knowledge base..." status stays active during this
             result = await deep_agent_app.ainvoke(initial_state)
+
+            # Cleanup: Complete clarification session if turn 3 was finished
+            if result.get("clarification_turn_3_complete"):
+                session_id = result.get("clarification_session_id")
+                if session_id:
+                    user_id_from_session = session_id.rsplit("_", 2)[0] if "_" in session_id else user_id
+                    clarification_tracker.complete_session(user_id_from_session)
+                    conversation_state_machine.mark_clarification_done(user_id_from_session)
+                    conversation_state_machine.transition_to_answering(user_id_from_session)
+                    logger.info(f"Completed clarification session for {user_id_from_session} after turn 3")
 
             # Progress indicator: 70% - Retrieved results
             yield f"data: {json.dumps({'type': 'progress', 'percentage': 70, 'message': 'Processing results...'}, ensure_ascii=False)}\n\n"
@@ -4611,54 +4821,8 @@ async def query_stream_endpoint(request: QueryRequest):
 
             logger.info(f"Response enhanced: {len(enhancement.improvements_made)} improvements made")
 
-            # ============================================================================
-            # INLINE CITATIONS (like Claude/Gemini style)
-            # ============================================================================
-            # Add [1][2] citation markers within the text where source content is referenced
-            def add_inline_citations(text: str, sources_list: list) -> tuple[str, dict]:
-                """Add inline citations [1][2] to text based on source content matching"""
-                if not sources_list or len(sources_list) == 0:
-                    return text, {}
-
-                cited_text = text
-                citation_map = {}
-
-                # Create citation map for top 5 sources
-                for idx, source in enumerate(sources_list[:5], 1):
-                    source_name = source.get("source", "Unknown").replace(".md", "").replace("HRD - ", "").strip()
-                    citation_map[idx] = source_name
-
-                    # Try to find sentences that match source content
-                    source_content = source.get("text", "") or source.get("content", "")
-                    if source_content:
-                        # Extract key phrases from source (first 50 words)
-                        source_words = source_content.split()[:50]
-                        key_phrases = []
-                        for i in range(0, len(source_words)-3, 3):
-                            phrase = " ".join(source_words[i:i+3])
-                            if phrase.lower() in text.lower():
-                                key_phrases.append(phrase)
-
-                        # Add citation after sentences containing key phrases
-                        if key_phrases:
-                            for phrase in key_phrases[:2]:  # Max 2 citations per source
-                                # Find sentence containing this phrase
-                                sentences = cited_text.split('. ')
-                                for i, sent in enumerate(sentences):
-                                    if phrase.lower() in sent.lower() and f'[{idx}]' not in sent:
-                                        # Add citation at end of sentence
-                                        sentences[i] = sent + f'[{idx}]'
-                                        cited_text = '. '.join(sentences)
-                                        break
-
-                return cited_text, citation_map
-
-            # Apply inline citations to the answer
-            if sources and len(sources) > 0:
-                final_answer, citation_map = add_inline_citations(final_answer, sources)
-                logger.info(f"📎 Added {len(citation_map)} inline citations")
-            else:
-                citation_map = {}
+            # Keep streaming output aligned with /query (no inline citations)
+            citation_map = {}
 
             # Format answer with confidence display and source references
             if llm_classifier_instance and confidence_result:
@@ -4918,6 +5082,19 @@ async def query_stream_endpoint(request: QueryRequest):
             traceback.print_exc()
             error_msg = json.dumps({"type": "error", "error": str(e)}, ensure_ascii=False)
             yield f"data: {error_msg}\n\n"
+        finally:
+            trace = graphiti_trace_var.get()
+            if trace is not None:
+                by_type = {
+                    k: {"count": v["count"], "elapsed_sec": round(v["elapsed_sec"], 3)}
+                    for k, v in trace.get("by_type", {}).items()
+                }
+                log_request(request_id, "🧠 GRAPHITI_SUMMARY", {
+                    "calls": trace.get("count", 0),
+                    "elapsed_sec": round(trace.get("elapsed_sec", 0.0), 3),
+                    "by_type": by_type
+                })
+            graphiti_trace_var.reset(graphiti_token)
 
     return StreamingResponse(
         generate(),

@@ -289,7 +289,7 @@ CRITICAL:
                 model=self.deployment_name,
                 messages=messages,
                 temperature=0.1,
-                max_tokens=1500
+                max_tokens=10000
             )
 
             base_answer = response.choices[0].message.content

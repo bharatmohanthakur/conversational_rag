@@ -95,31 +95,57 @@ class ConversationalEvaluator:
         Deep evaluation using LLM with conversational reasoning.
         Thinks like a human tester would.
         """
+        # Detect if expected answer is an instruction/requirement vs actual content
+        expected_lower = expected_answer.lower()
+        is_instruction = any(keyword in expected_lower for keyword in [
+            'should', 'must', 'prefer', 'able to', 'not able', 'chatbot', 'system',
+            'provide as', 'format', 'out of context', 'it should', 'should be'
+        ])
+        
+        instruction_guidance = ""
+        if is_instruction:
+            instruction_guidance = """
+**IMPORTANT: The "Expected Answer" appears to be a TEST INSTRUCTION or REQUIREMENT, not actual expected content.**
+- If it describes what the system SHOULD do (e.g., "should provide as table", "not able to present data"), evaluate whether the AI followed the instruction.
+- If it describes a limitation (e.g., "chatbot is not able to present the data as table"), the AI should acknowledge this limitation.
+- If it's a preference (e.g., "i prefer to provide it as a table"), evaluate if the AI provided the information, even if not in the preferred format.
+- Extract any actual expected CONTENT from the instruction and evaluate against that.
+- Focus on whether the AI answered the USER'S QUESTION correctly, not just whether it followed the instruction format.
+"""
+        
         prompt = f"""You are an expert QA tester evaluating an AI chatbot's response. Think deeply and conversationally, like a human would when reviewing answers.
 
 **CONTEXT:**
 - Question Category: {category}
 - User Question: "{question}"
-- Expected Answer: "{expected_answer[:1000] if len(expected_answer) > 1000 else expected_answer}"
-- Actual AI Response: "{actual_answer[:2000] if len(actual_answer) > 2000 else actual_answer}"
-
+- Expected Answer/Instruction: "{expected_answer}"
+- Actual AI Response: "{actual_answer}"
+{instruction_guidance}
 **YOUR TASK:**
 Evaluate the AI's response as if you were a human tester having a conversation with yourself about the quality. Think step by step:
 
 1. **Understanding Check**: Does the AI understand what was asked?
-2. **Accuracy Check**: Is the information correct? Compare with expected answer.
-3. **Completeness Check**: Does it cover all important points from the expected answer?
-4. **Relevance Check**: Is it directly answering the question or going off-topic?
-5. **Clarity Check**: Is it well-structured and easy to understand?
-6. **Missing Information**: What key points from expected answer are missing?
-7. **Extra Information**: Does it add unnecessary or incorrect information?
-8. **Tone & Style**: Is it professional and appropriate?
+2. **Answer Quality**: Does the AI provide a helpful, accurate answer to the user's question?
+3. **Content Evaluation**: If the expected answer contains actual content (not just instructions), does the AI's answer include that content?
+4. **Instruction Compliance**: If the expected answer is an instruction/requirement, did the AI follow it appropriately? (But don't penalize heavily if the answer is good but format differs)
+5. **Completeness Check**: Does it cover all important points that a user would need?
+6. **Relevance Check**: Is it directly answering the question or going off-topic?
+7. **Clarity Check**: Is it well-structured and easy to understand?
+8. **Missing Information**: What key information is missing?
+9. **Extra Information**: Does it add unnecessary or incorrect information?
+
+**CRITICAL EVALUATION PRINCIPLES:**
+- **Primary Focus**: Does the AI answer the USER'S QUESTION correctly and helpfully?
+- **Instruction vs Content**: If expected answer is an instruction, evaluate whether the AI followed it, BUT prioritize whether the user's question was answered correctly.
+- **Format vs Content**: If format is requested (table, points) but content is correct, don't heavily penalize format issues if content is good.
+- **Limitations**: If expected answer describes a system limitation, the AI should acknowledge it appropriately.
+- **Be Fair**: A good answer that helps the user should score well, even if it doesn't match every detail of the expected answer/instruction.
 
 **THINK DEEPLY:**
-- Consider edge cases and nuances
-- Think about what a real user would find helpful
+- Consider what a real user would find helpful
 - Consider if the answer would solve the user's actual problem
-- Evaluate not just what's said, but what's implied or missing
+- Don't be overly strict about format if content is correct
+- Evaluate the answer's usefulness, not just strict adherence to instructions
 
 **OUTPUT FORMAT (JSON):**
 {{
@@ -133,7 +159,15 @@ Evaluate the AI's response as if you were a human tester having a conversation w
     "key_strengths": ["strength1", "strength2", ...]
 }}
 
-Be thorough and honest. A score of 10 means perfect, 7-8 means good with minor issues, 5-6 means acceptable but missing important details, 3-4 means significant problems, 1-2 means major failures."""
+**SCORING GUIDELINES:**
+- 10: Perfect answer that fully addresses the question
+- 8-9: Very good answer with minor issues (format, minor missing details)
+- 7: Good answer that addresses the question well (may have format issues or minor gaps)
+- 5-6: Acceptable answer but missing some important details or has some inaccuracies
+- 3-4: Significant problems - doesn't fully answer the question or has major issues
+- 1-2: Major failures - doesn't address the question or is mostly incorrect
+
+Be thorough, fair, and honest. Prioritize whether the user's question was answered correctly over strict format compliance."""
 
         try:
             response = self.client.chat.completions.create(

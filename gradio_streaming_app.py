@@ -13,7 +13,7 @@ import threading
 import queue
 
 # Configuration
-API_BASE_URL = "http://localhost:8069"
+API_BASE_URL = "http://localhost:8060"
 STREAM_ENDPOINT = f"{API_BASE_URL}/query/stream"
 HEALTH_ENDPOINT = f"{API_BASE_URL}/health"
 

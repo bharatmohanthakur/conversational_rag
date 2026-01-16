@@ -150,7 +150,7 @@ class ClarificationHandler:
                     {"role": "user", "content": user_prompt}
                 ],
                 temperature=0.0,
-                max_tokens=1500
+                max_tokens=10000
             )
             answer_text = response.choices[0].message.content
 
