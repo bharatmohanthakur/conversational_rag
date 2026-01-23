@@ -1,0 +1,62 @@
+{
+  "timestamp": "20260113_200255",
+  "stats": {
+    "total": 10,
+    "passed": 2,
+    "failed": 8,
+    "errors": 0,
+    "avg_accuracy": 5.65,
+    "avg_response_time": 53.433976435661314
+  },
+  "total_questions": 10,
+  "categories": {
+    "Inurance": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 5.5
+    },
+    "maternity Leave": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avg_accuracy": 7.0
+    },
+    "Remote working": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 6.5
+    },
+    "Road and Promotion": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 2.0
+    },
+    "Comission": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 6.5
+    },
+    "Recruitment": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avg_accuracy": 8.0
+    },
+    "Commission": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 4.0
+    },
+    "EMPLOYEE RELOCATION": {
+      "total": 3,
+      "passed": 0,
+      "failed": 3,
+      "avg_accuracy": 5.666666666666667
+    }
+  }
+}

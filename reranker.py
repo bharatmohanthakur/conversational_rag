@@ -118,6 +118,7 @@ class Reranker:
     ) -> List[RankedDocument]:
         """
         Use cross-encoder style reranking (query-document pairs).
+        Uses only document numbers to reduce token usage.
         
         Args:
             query: User query
@@ -129,24 +130,30 @@ class Reranker:
         """
         ranked_docs = []
         
-        # Process in batches to avoid token limits
+        # Process in batches to avoid token limits (max 10 docs per batch)
         batch_size = 10
         for i in range(0, len(documents), batch_size):
             batch = documents[i:i + batch_size]
             batch_scores = original_scores[i:i + batch_size] if original_scores else None
             
-            # Create scoring prompt
-            doc_texts = []
+            # Create scoring prompt with document content, metadata, and original scores
+            doc_list = []
             for j, doc in enumerate(batch):
-                content = doc.get("content", "")[:500]  # Limit length
-                doc_texts.append(f"Document {j+1}:\n{content}")
+                doc_num = i + j + 1
+                metadata = doc.get("metadata", {})
+                source_file = metadata.get("source_file", "unknown")
+                original_score = batch_scores[j] if batch_scores and j < len(batch_scores) else 0.5
+                content = doc.get("content", "").strip()
+                # Truncate content to 500 chars per document to manage token usage while keeping context
+                content_preview = content[:500] + ("..." if len(content) > 500 else "")
+                doc_list.append(f"Document {doc_num}:\n  Source: {source_file}\n  Original_Score: {original_score:.3f}\n  Content: {content_preview}")
             
             prompt = f"""Rate the relevance of each document to the query on a scale of 0.0 to 1.0.
 
 Query: {query}
 
-Documents:
-{chr(10).join(doc_texts)}
+Documents (evaluate based on content, source filename, and original score):
+{chr(10).join(doc_list)}
 
 For each document, provide:
 1. A relevance score (0.0 = not relevant, 1.0 = highly relevant)
@@ -165,7 +172,7 @@ Respond in JSON format:
                     model=self.deployment_name,
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.1,
-                    max_tokens=1000,  # Increased for better JSON completion
+                    max_tokens=2000,  # Increased to handle content-based reranking with more detailed reasoning
                     response_format={"type": "json_object"}
                 )
                 

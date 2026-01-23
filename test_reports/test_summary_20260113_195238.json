@@ -1,0 +1,32 @@
+{
+  "timestamp": "20260113_195238",
+  "stats": {
+    "total": 3,
+    "passed": 2,
+    "failed": 1,
+    "errors": 0,
+    "avg_accuracy": 7.166666666666667,
+    "avg_response_time": 51.74144752820333
+  },
+  "total_questions": 3,
+  "categories": {
+    "Inurance": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 6.0
+    },
+    "maternity Leave": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avg_accuracy": 8.5
+    },
+    "Remote working": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avg_accuracy": 7.0
+    }
+  }
+}

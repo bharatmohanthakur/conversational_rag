@@ -150,7 +150,7 @@ class ClarificationHandler:
                     {"role": "user", "content": user_prompt}
                 ],
                 temperature=0.0,
-                max_tokens=1500
+                max_tokens=10000
             )
             answer_text = response.choices[0].message.content
 
@@ -290,7 +290,7 @@ class ClarificationHandler:
                     ]
                 
                 # Get clarification context
-                clarification_question = session.questions[0] if session.questions else None
+                clarification_question = session.questions_asked[0] if session.questions_asked else None
                 original_query = session.original_query if hasattr(session, 'original_query') else None
                 
                 # Use LLM classifier with full context

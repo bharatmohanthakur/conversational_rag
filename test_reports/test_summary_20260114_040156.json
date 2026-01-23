@@ -1,0 +1,26 @@
+{
+  "timestamp": "20260114_040156",
+  "stats": {
+    "total": 2,
+    "passed": 1,
+    "failed": 1,
+    "errors": 0,
+    "avg_accuracy": 7.0,
+    "avg_response_time": 56.895992040634155
+  },
+  "total_questions": 2,
+  "categories": {
+    "Recruitment": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avg_accuracy": 8.0
+    },
+    "EMPLOYEE RELOCATION": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 6.0
+    }
+  }
+}

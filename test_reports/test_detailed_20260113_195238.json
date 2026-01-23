@@ -1,0 +1,117 @@
+{
+  "timestamp": "20260113_195238",
+  "stats": {
+    "total": 3,
+    "passed": 2,
+    "failed": 1,
+    "errors": 0,
+    "avg_accuracy": 7.166666666666667,
+    "avg_response_time": 51.74144752820333
+  },
+  "results": [
+    {
+      "question": {
+        "category": "Inurance",
+        "question": "does my insurance covers me outside my residence country?",
+        "expected_answer": "Yes, Azadea provides travel medical insurance coverage for employees based in MEA, Africa, and GCC regions while traveling abroad on official business. This insurance covers emergency medical expenses, repatriation of mortal remains, life insurance benefits, and COVID-19 coverage. However, the coverage applies strictly to emergency treatment abroad and does not extend to planned or elective procedures. \"Abroad\" excludes Azadea's countries of operation, where employees remain entitled to the full policy benefits (both elective and emergency care). All emergency treatment abroad must be claimed on a reimbursement basis with the required documents submitted.",
+        "owner": "Layan",
+        "row_number": 2
+      },
+      "actual_answer": "I see you've switched from questions about leave to insurance coverage. How can I assist you with your insurance inquiry? Great question! I understand how important it is to know where your insurance coverage applies, especially if you're planning to travel. Your company insurance will cover you outside your country of residence, but only if you’re traveling for business reasons. If you’re traveling for personal reasons, unfortunately, the company's insurance won’t apply. Coverage details can sometimes vary, so I’d recommend checking your specific policy document or reaching out to HR directly for confirmation, just to be sure. If you’d like, I can also guide you on how to contact HR or access your policy information. 📊 Confidence: MEDIUM (60%) 📚 Sources: TRD - 023 - Travel Insurance - B - 3, TRV - 001 - Business Travel - B - 14, FNB - ADM - 001 - Accommodation Contract Rules - F - 1 ⚠️ Note: Coverage details may vary significantly between policies. The answer does not specify if emergency medical coverage or other exceptions apply during personal travel. Always check your specific poli...",
+      "response_time": 37.32697296142578,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 023 - Travel Insurance - B - 3.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "FNB - ADM - 001 - Accommodation Contract  Rules - F - 1.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 6.0,
+      "semantic_similarity": 0.6,
+      "completeness_score": 0.5,
+      "relevance_score": 0.8,
+      "evaluation_reasoning": "Let's break this down step by step. First, the AI does understand the general nature of the question: the user is asking if their insurance covers them outside their country of residence. The response correctly identifies that coverage is only for business travel, not personal travel, which is accurate and relevant. However, when we look at the expected answer, there are several critical details missing. The AI does not specify that the coverage is for emergency medical expenses, repatriation, life insurance, and COVID-19, nor does it clarify that elective procedures are excluded. It also fails to mention that 'abroad' excludes Azadea's countries of operation, which is a key nuance. The answer is somewhat generic and leans heavily on suggesting the user check their policy or contact HR, which, while prudent, does not directly answer the user's question with the specifics they are likely seeking. The structure is clear and friendly, and the tone is professional, but the lack of detail could leave the user uncertain about what is actually covered. The references to sources and the offer to help contact HR are nice touches, but they don't make up for the missing core information. For a user genuinely trying to understand their coverage, especially in an emergency, this answer would not be sufficient.",
+      "improvement_suggestions": "The AI should explicitly state what is covered (emergency medical expenses, repatriation, life insurance, COVID-19), clarify that coverage is only for official business travel, and mention that elective procedures are not included. It should also explain that 'abroad' excludes Azadea's countries of operation and that claims must be made on a reimbursement basis. Avoid over-relying on 'check with HR' as a fallback—provide as much concrete information as possible upfront.",
+      "issues_found": [
+        "Missing details about what is covered (emergency medical, repatriation, life insurance, COVID-19)",
+        "Does not mention exclusion of elective procedures",
+        "Fails to clarify that 'abroad' excludes Azadea's countries of operation",
+        "No mention of reimbursement process",
+        "Overly generic—relies too much on suggesting to check with HR",
+        "Does not address the distinction between emergency and elective care"
+      ]
+    },
+    {
+      "question": {
+        "category": "maternity Leave",
+        "question": "can i extend my metirnaty leave ?",
+        "expected_answer": "Yes, you can extend your maternity leave under certain conditions. If you need to extend your leave, you must contact your Line Manager and obtain their approval. You may use your accumulated annual leave days, request unpaid leave, or consider it as sick leave if you provide a medical report, subject to the discretion of your Line Manager and the local HR Department. Failure to follow this process may result in disciplinary action for unauthorized or illegitimate absence.",
+        "owner": "Layan",
+        "row_number": 3
+      },
+      "actual_answer": "I see you've switched topics from insurance to questions about maternity leave. How can I assist you with your leave extension? Great question! Yes, you're able to extend your maternity leave if you need more time. To start the process, it's important to reach out to your Line Manager before your original leave period ends so you can get their approval. This step is essential—without approval, the absence could be considered unauthorized and may lead to disciplinary action. You have a few options for extending your leave: You can use your accumulated annual leave days. Request unpaid leave. If you have a medical reason, you can request sick leave by providing a medical report. Just let your Line Manager know your situation and which type of leave you'd like to use for the extension. If you're considering extending your leave due to sickness before delivery, make sure to submit a medical report so it can be authorized appropriately. If you'd like more details on the documentation or specific steps, your HR department can provide extra guidance, or you can refer to the full Maternity and Paternity Leaves policy. I'm here if you have any other questions, or if you'd like tips on preparing your extension request! 📊 Confidence: HIGH (95%) 📚 Sources: GEN - 004 - Maternity and Paternity Leaves - P - 13",
+      "response_time": 60.190191984176636,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 8.5,
+      "semantic_similarity": 0.92,
+      "completeness_score": 0.9,
+      "relevance_score": 0.95,
+      "evaluation_reasoning": "Let's break this down step by step. \n\n1. **Understanding Check**: The AI clearly understands the user's question about extending maternity leave, restating the question and addressing the extension process directly. \n\n2. **Accuracy Check**: The response is accurate in its core advice: you can extend maternity leave, you must contact your Line Manager, and you need approval. It correctly lists the options for extension (annual leave, unpaid leave, sick leave with a medical report) and warns about unauthorized absence and possible disciplinary action, which matches the expected answer. \n\n3. **Completeness Check**: The AI covers almost all the key points from the expected answer: approval process, types of leave, need for a medical report for sick leave, and the consequences of not following the process. It also suggests contacting HR for more details, which is helpful. However, it doesn't explicitly mention the 'local HR Department' as part of the approval/discretion process (it only says HR can provide guidance), and it doesn't stress that the Line Manager and local HR Department have discretion over approval. \n\n4. **Relevance Check**: The answer is highly relevant, staying on topic and providing actionable steps. The initial sentence referencing a topic switch from insurance is unnecessary and could be confusing, but the rest is focused. \n\n5. **Clarity Check**: The response is clear, friendly, and well-structured. It breaks down the options and steps logically, making it easy for the user to follow. \n\n6. **Missing Information**: The main missing point is the explicit mention that both the Line Manager and local HR Department have discretion over the approval, not just the Line Manager. Also, it could emphasize more strongly that failure to follow the process may result in disciplinary action for 'unauthorized or illegitimate absence,' as in the expected answer. \n\n7. **Extra Information**: The AI adds a friendly offer to help with tips and refers to the policy document, which is helpful but not strictly necessary. The comment about switching topics from insurance is off-topic and could be omitted. \n\n8. **Tone & Style**: The tone is professional, supportive, and approachable, which is appropriate for HR-related queries. \n\n**Edge Cases & User Perspective**: A real user might be confused by the initial reference to insurance, but otherwise, they'd find the answer actionable and reassuring. The advice to contact HR for more details is a nice touch for users who want to dig deeper. \n\n**Overall**: The response is strong, accurate, and user-focused, but loses minor points for the off-topic intro and not fully emphasizing the HR Department's role in approval.",
+      "improvement_suggestions": "1. Remove the opening sentence about switching topics from insurance, as it's irrelevant and could confuse the user. 2. Explicitly state that both the Line Manager and local HR Department have discretion over the approval of the extension. 3. More clearly warn that failure to follow the process may result in disciplinary action for 'unauthorized or illegitimate absence.' 4. Optionally, clarify that all documentation should be submitted before the original leave ends.",
+      "issues_found": [
+        "Unnecessary reference to switching topics from insurance",
+        "Does not explicitly mention local HR Department's discretion in approval",
+        "Could more strongly emphasize consequences for not following the process"
+      ]
+    },
+    {
+      "question": {
+        "category": "Remote working",
+        "question": "how can i submit my remote working leave",
+        "expected_answer": "Based on the available documents, to submit a remote working leave at Azadea, you should:\n\nEnsure you meet the eligibility criteria for remote work as outlined in the policy (e.g., illness, emergency travel, online training, or other significant reasons).\nSubmit your request through the standard leave request process, referring to the \"Leave Request | HRD - GEN - 002\" document.\nSeek approval from your line manager.\nIf working from another Azadea office during personal travel/leave, also obtain consent from the hosting country’s local HR department for the specific dates.\nPlease follow the official leave request procedures and obtain the necessary approvals as per company policy. If you need further details on the submission process, you may refer to the Leave Request policy or contact your HR department.",
+        "owner": "Layan",
+        "row_number": 4
+      },
+      "actual_answer": "Now looking at your question about submitting a remote working leave—great question! I understand this is important for you, so let me guide you through the process at AZADEA. You’ll need to use the Oracle Applications system to submit your request. Here’s how you can do it: Open Oracle Applications and go to the main menu. Click on the 'View' tab, then select 'Requests' from the dropdown menu (as shown in the first image). In the 'Find Requests' window (second image), click on 'Submit a New Request...'. Simply follow the prompts to enter the details for your remote working leave. This procedure applies to all Back-office Employees, as outlined in [HRD - GEN - 016 - Remote Working - P - 2.md]. Once you’ve submitted your request, it’ll be forwarded to your manager for approval, and you’ll receive notifications through the HRMS system, as described in [HRD - TRD - 020 - Employee Attendance Validation - G - 1.md]. If you have any issues accessing Oracle or need further clarification on any step, feel free to let me know—I'm here to help! 📊 Confidence: HIGH (90%) 📚 Sources: GEN - 016 - Remote Working - P - 2, TRD - 020 - Employee Attendance Validation - G - 1",
+      "response_time": 57.70717763900757,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - TRD - 020 - Employee Attendance Validation - G - 1.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 7.0,
+      "semantic_similarity": 0.75,
+      "completeness_score": 0.7,
+      "relevance_score": 0.9,
+      "evaluation_reasoning": "Let's break this down step by step. First, the AI clearly understands that the user wants to know how to submit a remote working leave at Azadea and responds with a process-oriented answer. It accurately describes the technical steps for submitting a leave request in Oracle Applications, which is likely the correct platform for this process. However, when we compare it to the expected answer, there are some important gaps. The AI does not mention eligibility criteria for remote work (such as illness, emergency travel, etc.), which is a key compliance point in the policy. It also omits the need to refer to the 'Leave Request | HRD - GEN - 002' document and doesn't mention the special requirement to get approval from the hosting country's local HR if working from another Azadea office during personal travel/leave. These are significant omissions, as they could lead to misunderstandings or incomplete submissions by the user. On the positive side, the answer is clear, friendly, and walks the user through the technical steps, which is helpful. The tone is approachable and professional. However, it does introduce some unnecessary detail about navigating the Oracle system (like referencing images that the user can't see), and it cites policy documents that are not directly referenced in the expected answer. For a real user, the answer would help them start the process but might leave them unaware of important policy requirements, which could cause issues later. Overall, it's a decent answer but lacks some critical compliance and procedural details.",
+      "improvement_suggestions": "1. Explicitly mention the eligibility criteria for remote working leave as per company policy. 2. Reference the 'Leave Request | HRD - GEN - 002' document as the main procedural guide. 3. Include the requirement for approval from the hosting country's local HR if working from another Azadea office during personal travel/leave. 4. Streamline the Oracle Applications instructions and avoid referencing images unless they can be provided. 5. Suggest contacting HR for further clarification or if the user is unsure about eligibility.",
+      "issues_found": [
+        "Missing mention of eligibility criteria for remote working leave",
+        "Does not reference the main leave request policy document (HRD - GEN - 002)",
+        "Omits requirement for hosting country HR approval when working from another office",
+        "References images not available to the user",
+        "Focuses heavily on technical steps but misses policy compliance steps"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,114 @@
+{
+  "timestamp": "20260114_040734",
+  "stats": {
+    "total": 3,
+    "passed": 2,
+    "failed": 1,
+    "errors": 0,
+    "avg_accuracy": 7.0,
+    "avg_response_time": 46.182339668273926
+  },
+  "results": [
+    {
+      "question": {
+        "category": "Recruitment",
+        "question": "Can my brother join the company?",
+        "expected_answer": "to specify the postion ( tables are summarized ) to keep them as they are / and highlt that my brother cant join the company",
+        "owner": "Mais",
+        "row_number": 7
+      },
+      "actual_answer": "I see you've changed the topic from salary and allowances to asking about your brother joining the company. That's a great question—I'm glad you asked! According to AZADEA's recruitment policy, direct relatives such as siblings aren't eligible to join the company as full-time or part-time employees if you're already working here. This rule is in place to help prevent any potential conflicts of interest. If you have any other questions about our hiring policies or want to explore opportunities for friends or extended family, feel free to ask—I'm here to help! 📊 Confidence: MEDIUM (60%) 📚 Sources: TAD - 001 - Recruitment - P - 21, GEN - 006 - Employee Leaves - P - 15 ⚠️ Note: The answer does not provide direct quotes or detailed policy references, and lacks context about possible exceptions or definitions. The sources are listed but not integrated into the answer text.",
+      "response_time": 31.457296133041382,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TAD - 001 - Recruitment - P - 21.md",
+        "HRD - TAD - 001 - Recruitment - P - 21.md",
+        "HRD - TAD - 001 - Recruitment - P - 21.md",
+        "HRD - GEN - 006 - Employee Leaves - P - 15.md",
+        "HRD - GEN - 006 - Employee Leaves - P - 15.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 7.0,
+      "semantic_similarity": 0.8,
+      "completeness_score": 0.7,
+      "relevance_score": 0.9,
+      "evaluation_reasoning": "Let's break this down step by step:\n\n1. **Understanding Check**: The AI clearly understands the user's question. It recognizes the topic shift and directly addresses whether the user's brother can join the company. That's a good sign—it didn't get confused or answer a different question.\n\n2. **Accuracy Check**: The response accurately states that direct relatives (like siblings) can't join the company if the user is already employed, which matches the expected answer. It also mentions the rationale (conflict of interest), which is helpful. However, the confidence is only 'medium,' and the sources are not integrated into the main text, which makes the answer feel less authoritative. There's also a lack of direct quotes or more precise policy language, which would strengthen the accuracy.\n\n3. **Completeness Check**: The answer covers the main point: the user's brother can't join the company. However, it misses some expected details. The expected answer mentions specifying the position (possibly referring to summarizing tables or positions), and the instruction to 'keep them as they are' and 'highlight that my brother can't join.' The AI doesn't ask for or clarify the brother's intended position, nor does it reference any summarized tables or data. It also doesn't mention possible exceptions or definitions, which could be relevant for edge cases.\n\n4. **Relevance Check**: The answer is mostly relevant and on-topic. It doesn't stray into unrelated areas, though it does add a bit of extra information about friends or extended family, which isn't strictly necessary but could be seen as helpful.\n\n5. **Clarity Check**: The response is clear, friendly, and well-structured. It explains the policy in plain language and offers to help with further questions. The use of an emoji is friendly, though perhaps slightly informal for a recruitment policy answer.\n\n6. **Missing Information**: The answer doesn't specify or ask about the position the brother would apply for, nor does it reference summarized tables as suggested in the expected answer. It also doesn't discuss possible exceptions or define 'direct relatives' in more detail, which could be important for users with nuanced situations.\n\n7. **Extra Information**: The mention of friends or extended family is extra, but not harmful. However, the answer could be more concise and focused strictly on the user's question.\n\n8. **Tone & Style**: The tone is friendly, professional, and supportive. However, the use of emojis and the phrase 'I'm glad you asked!' might be a bit too casual for a formal recruitment policy context.\n\n**Edge Cases & User Helpfulness**: A real user might want to know if there are exceptions, or if the policy applies to all positions or only certain ones. The answer doesn't address these nuances. Also, referencing the sources without integrating them into the answer text reduces trust and usefulness.\n\n**Overall**: The answer is good, but not perfect. It's accurate and clear, but lacks some completeness and authority. It would benefit from more precise policy references, clarification about positions, and addressing possible exceptions.",
+      "improvement_suggestions": "1. Integrate the cited sources directly into the answer for greater authority.\n2. Ask or clarify what position the user's brother is interested in, as the policy may vary by role.\n3. Reference or summarize any relevant tables or data if applicable.\n4. Mention if there are any exceptions to the policy, or clarify the definition of 'direct relatives.'\n5. Use a slightly more formal tone and avoid emojis for policy-related answers.\n6. Be more concise and focused on the user's specific question.",
+      "issues_found": [
+        "Does not specify or ask about the brother's intended position",
+        "Does not reference summarized tables or data as per expected answer",
+        "Sources are listed but not integrated into the answer text",
+        "Does not mention possible exceptions or clarify definitions",
+        "Slightly informal tone for a recruitment policy context"
+      ]
+    },
+    {
+      "question": {
+        "category": "EMPLOYEE RELOCATION",
+        "question": "am relocating to another country what will be my allowance?",
+        "expected_answer": "i prefer to provide it as a table",
+        "owner": "Layan",
+        "row_number": 9
+      },
+      "actual_answer": "I see you've changed the topic to relocation and allowances. Let me assist you with that. Great question! Relocating to another country is an exciting step, and I'd be happy to help you understand what you're entitled to at Azadea Group. When you relocate, you'll receive a relocation allowance designed to make your transition as smooth as possible. This usually includes: Economy air travel to your new destination, arranged by the company. Return air travel if your contract ends. If you're Grade 12 or above, your spouse and up to two children are also covered for travel costs. If you prefer to drive your own car to the new country, you’ll receive an allowance equal to the cost of a plane ticket to help cover fuel, tolls, and depreciation (if applicable). To help you settle in, Azadea provides free accommodation in a company-owned apartment for 30 days (unless you're relocating back to your home country). Just keep in mind that your specific entitlements may depend on your grade, family situation, and the reason for your move. For all the details, it’s a good idea to check your relocation policy or reach out directly to HR—they’re always happy to clarify anything for you. If you’re curious about other aspects of relocation, like settling-in support or how allowances work for different grades, let me know! I’m here to help with any questions you might have. 📊 Confidence: MEDIUM (50%) 📚 Sources: TRD - 012 - Employee Relocation - P - 16",
+      "response_time": 57.8123140335083,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 6.5,
+      "semantic_similarity": 0.65,
+      "completeness_score": 0.6,
+      "relevance_score": 0.7,
+      "evaluation_reasoning": "Let's break this down step by step. First, the AI does understand the general topic—the user is asking about relocation allowances when moving to another country. It responds with details about what allowances Azadea Group provides, mentioning travel, accommodation, and family coverage, which is relevant and accurate to the context. However, the expected answer specifically requests the information in a table format, which the AI completely ignores. This is a significant miss, as formatting can be crucial for clarity and comparison, especially with allowances that may vary by grade, family status, etc. \n\nOn completeness, the AI covers several key points (travel, accommodation, eligibility by grade), but it doesn't break down the allowance amounts or provide a structured summary, which would be expected in a table. It also lacks specifics about how much the allowances are, which is likely what the user wants to see. The AI does mention that entitlements depend on grade and family situation, but it doesn't provide a breakdown or direct the user to a table or chart for clarity. \n\nRelevance is decent—the AI stays on topic, but it adds extra conversational fluff and general advice about contacting HR, which, while helpful, doesn't directly answer the user's request for a table. The structure is clear and friendly, but the answer is a bit verbose and could be more concise. \n\nFrom a user perspective, someone relocating would want to see a clear, itemized list or table of allowances to understand what they're entitled to. The AI's answer is helpful for general understanding but falls short of solving the user's actual problem. It doesn't fulfill the explicit request for a table, nor does it provide concrete figures or a summary that would help the user make decisions or plan their move.",
+      "improvement_suggestions": "1. Present the allowance information in a table format, as requested. 2. Include specific figures or ranges for each allowance item (e.g., travel, accommodation, family coverage). 3. Summarize entitlements by grade and family status for clarity. 4. Reduce conversational fluff and focus on delivering the requested structured information. 5. Add a note about where to find the official policy or a link to the relevant document for further details.",
+      "issues_found": [
+        "Did not provide information in a table format as requested",
+        "Lacks specific allowance amounts",
+        "Too verbose; could be more concise",
+        "Does not summarize entitlements by grade/family status",
+        "Extra conversational information not directly relevant to the request"
+      ]
+    },
+    {
+      "question": {
+        "category": "Disciplinary actions",
+        "question": "when the warning will be expired",
+        "expected_answer": "i prefer to provide it as a table  and there is active period listed in the policy",
+        "owner": "Mais",
+        "row_number": 22
+      },
+      "actual_answer": "I see you've switched topics from salary and allowances to questions about warnings and their expiration. Thanks for your question! I understand it's important to know when warnings expire, especially for planning ahead. Here’s a quick overview of how it works according to company policy: Verbal warnings stay on record for 1 month. First written warnings remain for 3 months. Second written warnings are active for 6 months. Final warnings last for 12 months. After these periods, each warning is removed from your file and doesn't impact your record or any future disciplinary actions. If you’d like more details or have questions about your specific situation, just let me know—I'm here to help! 📊 Confidence: HIGH (95%) 📚 Sources: TPD - 001 - Disciplinary Actions - B - 4, TMD - 001 - Disciplinary Actions - B - 5",
+      "response_time": 49.277408838272095,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TPD - 001 - Disciplinary Actions - B - 4.md",
+        "HRD - TMD - 001 - Disciplinary Actions - B - 5.md",
+        "HRD - TMD - 001 - Disciplinary Actions - B - 5.md",
+        "HRD - TPD - 001 - Disciplinary Actions - B - 4.md",
+        "HRD - TPD - 001 - Disciplinary Actions - B - 4.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 7.5,
+      "semantic_similarity": 0.85,
+      "completeness_score": 0.7,
+      "relevance_score": 0.95,
+      "evaluation_reasoning": "Let's break this down step by step. First, the AI clearly understood the user's question about warning expiration periods and responded with specific durations for each type of warning. That's good—it shows comprehension and relevance. The information provided seems accurate and matches typical disciplinary policy structures, but without access to the actual referenced policy, I can't verify every detail. The AI also cites sources, which adds credibility, although the user didn't ask for them. \n\nHowever, compared to the expected answer, the AI missed a key user preference: the user wanted the information presented as a table and specifically referenced the 'active period listed in the policy.' The AI gave a narrative summary instead, which is clear and easy to read but doesn't align with the requested format. This is a notable gap in completeness and user-centricity. \n\nOn clarity, the response is well-structured and easy to understand, with a friendly, professional tone. It avoids jargon and explains what happens after the expiration period, which is helpful. There is a slight excess in conversational framing (e.g., referencing the topic switch and offering further help), but it's not distracting. The use of emojis might not be appropriate for all professional contexts, but it does make the tone warmer. \n\nOverall, the answer is accurate and relevant, but it misses the user's specific request for a table and doesn't highlight the 'active period' terminology. For a real user, this would be helpful but not ideal, as it doesn't fully solve the problem in the way the user asked.",
+      "improvement_suggestions": "1. Present the information as a table, as the user preferred. 2. Explicitly mention the 'active period' terminology from the policy. 3. Reduce unnecessary conversational framing about topic switching. 4. Consider removing emojis for a more professional tone, unless the context is informal. 5. Directly reference the policy section on 'active period' to show alignment with user expectations.",
+      "issues_found": [
+        "Did not present information as a table, as requested",
+        "Did not explicitly mention 'active period' terminology",
+        "Extra conversational framing about topic switching",
+        "Use of emojis may be inappropriate for professional context"
+      ]
+    }
+  ]
+}

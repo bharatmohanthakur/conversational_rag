@@ -1,0 +1,102 @@
+{
+  "timestamp": "20260113_193210",
+  "stats": {
+    "total": 3,
+    "passed": 0,
+    "failed": 0,
+    "errors": 0,
+    "avg_accuracy": 0.0,
+    "avg_response_time": 32.57058151563009
+  },
+  "results": [
+    {
+      "question": {
+        "category": "Inurance",
+        "question": "does my insurance covers me outside my residence country?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 2
+      },
+      "actual_answer": "<p>You've switched to asking about insurance coverage outside your residence country. Let me help with that.</p>\n<p>That's a great question—I'd be happy to clarify this for you! Your insurance will cover you when you're traveling outside your residence country, but only if it's for business purposes. If you’re traveling for personal reasons, unfortunately, the coverage doesn't apply. For business trips, the insurance typically includes worldwide medical coverage and works on a reimbursement basis, so you'll need to keep any relevant documentation from your trip. If you’d like more details about your specific policy, or if anything’s unclear, I recommend reaching out to HR or checking your policy documents directly. Let me know if you need help with that or have any other questions about your benefits!</p>\n<hr />\n<p>📊 <strong>Confidence:</strong> MEDIUM (70%)\n📚 <strong>Sources:</strong> TRV - 001 - Business Travel - B - 14, FNB - ADM - 001 - Accommodation Contract  Rules - F - 1\n⚠️ <strong>Note:</strong> The answer is based on general policy references and may not apply to your specific insurance plan. Always verify with your insurer or HR for your individual coverage details.</p>\n",
+      "response_time": 30.89083218574524,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "FNB - ADM - 001 - Accommodation Contract  Rules - F - 1.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "maternity Leave",
+        "question": "can i extend my metirnaty leave ?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 3
+      },
+      "actual_answer": "<p>I see you've switched topics to maternity leave. How can I assist you with extending your leave?</p>\n<p>Great question! I'd be happy to help you with information about extending your maternity leave.</p>\n<p>Yes, it is possible to extend your maternity leave beyond the standard period. To do this, you'll need to reach out to your Line Manager and get their approval before making any arrangements. This step is really important—taking extra leave without approval could lead to disciplinary action or even be considered a breach of your contract (as mentioned in the HRD - GEN - 004 - Maternity and Paternity Leaves - P - <a href=\"http://13.md\">13.md</a> policy).</p>\n<p>When it comes to extending your leave, you have a few options:</p>\n<ul>\n<li>You can use any accumulated annual leave days you have available.</li>\n<li>You can request unpaid leave.</li>\n<li>If you have a valid medical reason, you may also apply for sick leave by submitting a medical report. Just a note—sick leave is typically authorized before delivery, provided you have the necessary documentation.</li>\n</ul>\n<p>No matter which option you choose, the key is to discuss it with your Line Manager and get their explicit approval. If you need more details or have a unique situation, I’d recommend reviewing the official policy (HRD - GEN - 004 - Maternity and Paternity Leaves - P - <a href=\"http://13.md\">13.md</a>) or reaching out to your HR department for guidance.</p>\n<p>If you have any other questions—like what documents you might need, or how this could affect your benefits—just let me know. I’m here to help!</p>\n<hr />\n<p>📊 <strong>Confidence:</strong> HIGH (95%)\n📚 <strong>Sources:</strong> GEN - 004 - Maternity and Paternity Leaves - P - 13</p>\n",
+      "response_time": 37.58430242538452,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "Remote working",
+        "question": "how can i submit my remote working leave",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 4
+      },
+      "actual_answer": "<p>You've shifted from general leave topics to specifically asking about remote working leave submission.</p>\n<p>Now shifting to your question about submitting a remote working leave—I'd be happy to guide you through the process. I understand how important it is to get your leave requests handled smoothly.</p>\n<p>To submit your remote working leave, you'll need to use the Oracle Applications system. Here’s a quick step-by-step:</p>\n<ol>\n<li>Log in to Oracle Applications.</li>\n<li>Head to the 'People' section.</li>\n<li>Open the 'View' menu and select 'Requests.'</li>\n<li>In the 'Find Requests' window, click on 'Submit a New Request...'</li>\n<li>Fill in the required details for your remote working leave, such as absence type and dates.</li>\n<li>Submit your request.</li>\n</ol>\n<p>Once you’ve sent it in, your request goes straight to your line manager for approval via the HRMS system. This process applies to all Back-office Employees, as noted in HRD - GEN - 016 - Remote Working - P - <a href=\"http://2.md\">2.md</a>.</p>\n<p>If you need any help during submission or have questions about leave types, just let me know—I'm here to help.</p>\n<hr />\n<p>📊 <strong>Confidence:</strong> HIGH (95%)\n📚 <strong>Sources:</strong> TRD - 020 - Employee Attendance Validation - G - 1, GEN - 016 - Remote Working - P - 2</p>\n",
+      "response_time": 29.236609935760498,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 020 - Employee Attendance Validation - G - 1.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - TRD - 020 - Employee Attendance Validation - G - 1.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    }
+  ]
+}

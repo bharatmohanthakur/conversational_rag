@@ -1,0 +1,164 @@
+{
+  "timestamp": "20260113_213341",
+  "stats": {
+    "total": 84,
+    "passed": 21,
+    "failed": 58,
+    "errors": 0,
+    "avg_accuracy": 5.468354430379747,
+    "avg_response_time": 50.25098187866665
+  },
+  "total_questions": 84,
+  "categories": {
+    "Inurance": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 6.0
+    },
+    "maternity Leave": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avg_accuracy": 7.5
+    },
+    "Remote working": {
+      "total": 2,
+      "passed": 0,
+      "failed": 2,
+      "avg_accuracy": 5.5
+    },
+    "Road and Promotion": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 3.0
+    },
+    "Comission": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 6.5
+    },
+    "Recruitment": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0,
+      "avg_accuracy": 7.75
+    },
+    "Commission": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 4.0
+    },
+    "EMPLOYEE RELOCATION": {
+      "total": 3,
+      "passed": 0,
+      "failed": 3,
+      "avg_accuracy": 6.5
+    },
+    "Shop Bonus Preparation": {
+      "total": 2,
+      "passed": 1,
+      "failed": 1,
+      "avg_accuracy": 7.0
+    },
+    "Maternity Leave / Leave": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avg_accuracy": 9.0
+    },
+    "Leaves": {
+      "total": 14,
+      "passed": 4,
+      "failed": 10,
+      "avg_accuracy": 5.321428571428571
+    },
+    "TRAINING AND DEVELOPMENT OF EMPLOYEES": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 5.5
+    },
+    "Disciplinary actions": {
+      "total": 4,
+      "passed": 3,
+      "failed": 1,
+      "avg_accuracy": 7.75
+    },
+    "Employee discount": {
+      "total": 2,
+      "passed": 1,
+      "failed": 1,
+      "avg_accuracy": 6.75
+    },
+    "General": {
+      "total": 6,
+      "passed": 2,
+      "failed": 4,
+      "avg_accuracy": 3.75
+    },
+    "": {
+      "total": 24,
+      "passed": 2,
+      "failed": 22,
+      "avg_accuracy": 4.729166666666667
+    },
+    "Import shipment process": {
+      "total": 2,
+      "passed": 1,
+      "failed": 1,
+      "avg_accuracy": 6.75
+    },
+    "Reconciliation": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 3.5
+    },
+    "uniform allowance": {
+      "total": 4,
+      "passed": 0,
+      "failed": 2,
+      "avg_accuracy": 4.75
+    },
+    "INTERNSHIP & SHADOWING": {
+      "total": 4,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 2.0
+    },
+    "Costing and Reporting": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 5.5
+    },
+    "Retail Services": {
+      "total": 2,
+      "passed": 1,
+      "failed": 1,
+      "avg_accuracy": 7.0
+    },
+    "Quality Management System": {
+      "total": 2,
+      "passed": 0,
+      "failed": 2,
+      "avg_accuracy": 5.0
+    },
+    "Incentive": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avg_accuracy": 8.5
+    },
+    "Attendance": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avg_accuracy": 9.0
+    }
+  }
+}

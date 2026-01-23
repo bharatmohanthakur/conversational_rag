@@ -1,0 +1,100 @@
+{
+  "timestamp": "20260113_194437",
+  "stats": {
+    "total": 3,
+    "passed": 0,
+    "failed": 0,
+    "errors": 0,
+    "avg_accuracy": 0.0,
+    "avg_response_time": 29.841882785161335
+  },
+  "results": [
+    {
+      "question": {
+        "category": "Inurance",
+        "question": "does my insurance covers me outside my residence country?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 2
+      },
+      "actual_answer": "You've shifted the conversation from salary-related questions to insurance coverage. Let me help you with your insurance query. Great question! I understand that knowing where your insurance covers you is important, especially when working abroad. Typically, your company insurance will cover you while you're outside your country of residence if you're traveling for business purposes. This includes both medical and travel insurance for business trips, such as emergency medical coverage and reimbursement for certain claims. However, it's good to know that personal travel outside your country of residence isn't included under the company's insurance policy. Coverage details can sometimes vary, so I recommend checking your specific policy or reaching out to HR directly if you need more personalized information. If you have any other questions about your benefits or need help with something else, just let me know—I'm here to help! 📊 Confidence: MEDIUM (70%) 📚 Sources: TRD - 023 - Travel Insurance - B - 3, TRV - 001 - Business Travel - B - 14, FNB - ADM - 001 - Accommodation Contract Rules - F - 1 ⚠️ Note: Coverage details may vary significantly depending on your specific insurance policy and employer. The answer is based on general company policy and may not apply to your situation. Always verify wi...",
+      "response_time": 29.449076652526855,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md",
+        "FNB - ADM - 001 - Accommodation Contract  Rules - F - 1.md",
+        "HRD - TRD - 023 - Travel Insurance - B - 3.md",
+        "HRD - TRD - 023 - Travel Insurance - B - 3.md",
+        "HRD - TRV - 001 - Business Travel - B - 14.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "maternity Leave",
+        "question": "can i extend my metirnaty leave ?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 3
+      },
+      "actual_answer": "I see you've switched topics from insurance to questions about maternity leave. How can I assist you with your maternity leave extension? Great question! Extending your maternity leave is definitely possible, and I'd be happy to guide you through the process. You'll need to reach out to your Line Manager to request an extension and get their approval. Depending on your situation, you can use your accumulated annual leave, request unpaid leave, or, if you have a valid medical certificate, use sick leave to extend your time away. Just a quick note—it's important to make sure everything is approved to avoid any disciplinary issues. Policies can differ depending on your country or position, so checking in with your HR department or Line Manager for details specific to you is always a good idea. If you have other questions about parental benefits or returning to work, feel free to ask—I'm here to help! 📊 Confidence: HIGH (90%) 📚 Sources: GEN - 004 - Maternity and Paternity Leaves - P - 13 ⚠️ Note: Policies regarding extending maternity leave can vary significantly by country, company, and employment contract. Please confirm the exact process and eligibility with your HR department or consult...",
+      "response_time": 26.315675497055054,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md",
+        "HRD - GEN - 004 - Maternity and Paternity Leaves - P - 13.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "Remote working",
+        "question": "how can i submit my remote working leave",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 4
+      },
+      "actual_answer": "You've shifted from general leave topics to specifically asking about remote working leave submission. Now shifting from our previous discussion on insurance and maternity leave, let me help you with submitting a remote working leave request. I understand this is important, so here’s a straightforward way to do it: Log in to Oracle Applications. Head to the 'People' section. Under the 'View' menu, choose 'Requests.' In the 'Find Requests' window, click 'Submit a New Request.' Fill out all the necessary details for your remote working leave, such as absence type and dates. Submit your request. Once you've submitted it, your request will be sent to your line manager for approval, following the company's HR guidelines ([HRD - TRD - 020 - Employee Attendance Validation - G - 1.md]). This process applies to all Back-office Employees as outlined in [HRD - GEN - 016 - Remote Working - P - 2.md]. If you need any help along the way or have questions about what details to include, please let me know—I'm here to support you! 📊 Confidence: MEDIUM (70%) 📚 Sources: TRD - 020 - Employee Attendance Validation - G - 1, GEN - 016 - Remote Working - P - 2 ⚠️ Note: The answer assumes you are a back-office employee with access to Oracle Applications and that your organization follows the referenced policies. If your situation differs, the process may not apply...",
+      "response_time": 33.7608962059021,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 020 - Employee Attendance Validation - G - 1.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - TRD - 020 - Employee Attendance Validation - G - 1.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md",
+        "HRD - GEN - 016 - Remote Working - P - 2.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    }
+  ]
+}

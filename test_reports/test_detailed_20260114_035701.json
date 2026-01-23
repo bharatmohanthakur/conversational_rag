@@ -1,0 +1,116 @@
+{
+  "timestamp": "20260114_035701",
+  "stats": {
+    "total": 3,
+    "passed": 1,
+    "failed": 2,
+    "errors": 0,
+    "avg_accuracy": 6.666666666666667,
+    "avg_response_time": 49.333503564198814
+  },
+  "results": [
+    {
+      "question": {
+        "category": "Recruitment",
+        "question": "Can my brother join the company?",
+        "expected_answer": "to specify the postion ( tables are summarized ) to keep them as they are / and highlt that my brother cant join the company",
+        "owner": "Mais",
+        "row_number": 7
+      },
+      "actual_answer": "I see you've changed the topic from salary and benefits to asking about your brother joining the company. That's a great question—I'm glad you're exploring opportunities for your brother! At the moment, Azadea Group has a policy that doesn't allow direct relatives of current employees to join the company as employees. If your employment status ever changes, though, your brother would be welcome to apply in the future. If you'd like more details about our hiring policies or referral programs, just let me know—I'm here to help! 📊 Confidence: MEDIUM (60%) 📚 Sources: TRD - 003 - Employee Discounts - P - 27, GEN - 006 - Employee Leaves - P - 15, GEN - 010 - Employment Visa Release - P - 2",
+      "response_time": 42.798107862472534,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 003 - Employee Discounts - P - 27.md",
+        "HRD - GEN - 006 - Employee Leaves - P - 15.md",
+        "HRD - GEN - 010 - Employment Visa Release - P - 2.md",
+        "HRD - TRD - 003 - Employee Discounts - P - 27.md",
+        "HRD - GEN - 006 - Employee Leaves - P - 15.md",
+        "HRD - TRD - 003 - Employee Discounts - P - 27.md",
+        "HRD - TRD - 003 - Employee Discounts - P - 27.md",
+        "HRD - GEN - 006 - Employee Leaves - P - 15.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 7.5,
+      "semantic_similarity": 0.75,
+      "completeness_score": 0.7,
+      "relevance_score": 0.85,
+      "evaluation_reasoning": "Let's break this down step by step. First, the AI clearly understands the user's question—it's about whether the user's brother can join the company. The response correctly identifies the topic shift and addresses the question directly. In terms of accuracy, the AI provides a clear policy statement: direct relatives of current employees cannot join the company. This aligns with the expected answer's requirement to highlight that the brother can't join. However, the expected answer also mentions specifying the position (with tables summarized) and keeping them as they are, which the AI does not address at all. This means the response is incomplete—it doesn't touch on the position or any tabular data, nor does it clarify what 'tables are summarized' refers to. The response is relevant to the main question but misses some context that might be important, especially if the user was expecting information about specific roles or a summary of positions. Clarity-wise, the answer is well-structured and easy to understand, and the tone is friendly and professional. The offer to provide more details is helpful, but referencing sources that seem unrelated to the hiring of relatives (like employee discounts and leaves) could confuse the user. The main missing information is the expected reference to positions/tables and a more explicit statement that the brother cannot join, as well as a lack of context on why those tables matter. The extra information about referral programs and employment status is not strictly necessary but does not detract significantly. Overall, the answer would address the user's immediate concern but leaves out details that could be important depending on the user's intent.",
+      "improvement_suggestions": "1. Explicitly mention or summarize the relevant positions or tables if that was part of the user's workflow. 2. Clarify the policy with a more direct statement, e.g., 'Unfortunately, your brother cannot join the company while you are employed here, regardless of position.' 3. Only reference sources directly related to the hiring of relatives to avoid confusion. 4. If the user is expected to keep tables as they are, acknowledge that instruction or ask for clarification if the context is unclear.",
+      "issues_found": [
+        "Does not address expected mention of positions/tables",
+        "References sources that may be irrelevant",
+        "Missing explicit instruction to keep tables as they are",
+        "Indirectly states the brother cannot join (could be clearer)"
+      ]
+    },
+    {
+      "question": {
+        "category": "EMPLOYEE RELOCATION",
+        "question": "am relocating to another country what will be my allowance?",
+        "expected_answer": "i prefer to provide it as a table",
+        "owner": "Layan",
+        "row_number": 9
+      },
+      "actual_answer": "I see you've changed the topic to relocation allowances. Let me assist you with that. Great question! If you're an AZADEA employee relocating to another country, you're generally eligible for a relocation allowance. This is typically a one-time payment, calculated as a percentage of your new basic salary, and it's paid in the currency of your destination country. The allowance is usually processed within 3 working days. Just a quick note—if this is your second relocation within the same year, you'll only receive the full allowance if the move is at the company's request. You may also be entitled to an economy air ticket from your current location to the new country. Allowances and benefits can vary based on your specific situation and company policy, so if you'd like more personalized details or have questions about other relocation benefits, please let me know—I'm here to help! 📊 Confidence: MEDIUM (60%) 📚 Sources: TRD - 012 - Employee Relocation - P - 16",
+      "response_time": 48.636558532714844,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md",
+        "HRD - TRD - 012 - Employee Relocation - P - 16.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 6.0,
+      "semantic_similarity": 0.6,
+      "completeness_score": 0.5,
+      "relevance_score": 0.7,
+      "evaluation_reasoning": "Let's break this down step by step. First, the user asked a very direct question: 'what will be my allowance?' and the expected answer is to provide this information as a table. The AI does recognize the topic (relocation allowance) and gives a general overview of the policy, mentioning it's a one-time payment, calculated as a percentage of the new basic salary, processed within 3 days, and includes an air ticket. It also notes exceptions for second relocations within the same year. So, it does show some understanding and provides relevant information. However, it doesn't actually provide the allowance amount, a calculation, or a table as requested/expected. The answer is more of a policy summary than a concrete response. For a user, this would be frustrating—they asked for their allowance, not a general explanation. The AI also adds some extra info (e.g., about air tickets and company-requested moves), which is helpful context but not what was asked. The tone is friendly and professional, and the structure is clear, but the answer is ultimately incomplete and not directly actionable. The biggest issue is the lack of a table or any specific numbers, which was the expected format. In summary, the response is accurate in its general policy description but misses the mark in completeness, relevance to the user's direct question, and format.",
+      "improvement_suggestions": "1. Directly answer the user's question by providing a table with the allowance breakdown, as expected. 2. If unable to provide a personalized table, explain what information is needed to do so (e.g., user's salary, destination country) and prompt the user to provide it. 3. Minimize general policy explanations unless the user asks for them; focus on actionable, user-specific information. 4. If referencing company policy documents, consider summarizing key points in a table for clarity. 5. Always match the expected format if specified (in this case, a table).",
+      "issues_found": [
+        "Did not provide information in a table as expected",
+        "Did not give a specific allowance amount or calculation",
+        "Focused on general policy rather than the user's direct question",
+        "Some extra information not directly relevant to the question"
+      ]
+    },
+    {
+      "question": {
+        "category": "Disciplinary actions",
+        "question": "when the warning will be expired",
+        "expected_answer": "i prefer to provide it as a table  and there is active period listed in the policy",
+        "owner": "Mais",
+        "row_number": 22
+      },
+      "actual_answer": "It looks like you've switched topics to asking about warning expiration. Let me assist you with that. Great question! Under company policy, a verbal warning stays active in an employee's file for one month. After that, it expires and won't be considered in any further disciplinary actions. Just to clarify, this timeline applies specifically to verbal warnings—other types of warnings may have different durations. If you need details about written or other warnings, or if you have any other questions, please let me know—I'm here to help. 📊 Confidence: MEDIUM (70%) 📚 Sources: TPD - 001 - Disciplinary Actions - B - 4, TMD - 001 - Disciplinary Actions - B - 5 ⚠️ Note: The answer is based on general company policy and may not apply to your specific situation. No context was provided to confirm applicability. Please verify with your HR department or refer to your ...",
+      "response_time": 56.56584429740906,
+      "status_code": 200,
+      "error": null,
+      "sources": [
+        "HRD - TPD - 001 - Disciplinary Actions - B - 4.md",
+        "HRD - TMD - 001 - Disciplinary Actions - B - 5.md",
+        "HRD - TMD - 001 - Disciplinary Actions - B - 5.md",
+        "HRD - TPD - 001 - Disciplinary Actions - B - 4.md",
+        "HRD - TMD - 001 - Disciplinary Actions - B - 5.md"
+      ],
+      "confidence": "unknown",
+      "accuracy_score": 6.5,
+      "semantic_similarity": 0.7,
+      "completeness_score": 0.6,
+      "relevance_score": 0.8,
+      "evaluation_reasoning": "Let's break this down step by step. First, the AI does understand the user's question; it recognizes the user is asking about the expiration of a warning, specifically in the context of disciplinary actions. That's a good start. However, when I compare the actual response to the expected answer, there are some clear gaps. The expected answer suggests providing the information as a table and referencing the 'active period' as listed in the policy. The AI instead gives a narrative answer, specifying that a verbal warning lasts one month, but doesn't present the information in a table or mention the 'active period' terminology directly. This means the answer isn't as complete as it could be, especially if the policy covers multiple types of warnings with different durations. \n\nThe AI does try to clarify that the timeline applies only to verbal warnings and hints that other warnings may have different durations, but it doesn't provide those details or a comparative view. This could leave the user with unanswered questions, particularly if they wanted to know about written or final warnings. The response is mostly relevant and stays on topic, but the inclusion of the 'Confidence: MEDIUM (70%)' and the sources, while potentially helpful, feel a bit out of place in a conversational setting. The answer is clear and easy to read, but it could be more concise and focused. \n\nA real user would likely appreciate a table or at least a summary of all warning types and their expiration periods, as well as a direct reference to the policy's 'active period' language. The answer does not fully solve the user's problem, as it only partially addresses the question and omits key information. The tone is friendly and professional, but the emoji and confidence score might not be appropriate for all workplace contexts.",
+      "improvement_suggestions": "1. Present the expiration periods for all warning types in a table format, as suggested in the expected answer. 2. Use the specific terminology from the policy, such as 'active period.' 3. Remove unnecessary elements like the emoji and confidence score unless specifically requested. 4. Be more concise and focus on directly answering the user's question. 5. Reference the relevant policy section more clearly, and suggest verifying with HR only if the policy is ambiguous.",
+      "issues_found": [
+        "Did not provide information in table format as expected",
+        "Did not mention 'active period' terminology from policy",
+        "Only covered verbal warning, not other types",
+        "Included unnecessary elements (emoji, confidence score)",
+        "Slightly verbose and less focused"
+      ]
+    }
+  ]
+}

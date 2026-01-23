@@ -1,0 +1,86 @@
+{
+  "timestamp": "20260114_045128",
+  "stats": {
+    "total": 47,
+    "passed": 8,
+    "failed": 39,
+    "errors": 0,
+    "avg_accuracy": 4.595744680851064,
+    "avg_response_time": 37.67823731645625
+  },
+  "total_questions": 47,
+  "categories": {
+    "Recruitment": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 3.5
+    },
+    "EMPLOYEE RELOCATION": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 6.5
+    },
+    "Disciplinary actions": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avg_accuracy": 7.0
+    },
+    "Leaves": {
+      "total": 11,
+      "passed": 3,
+      "failed": 8,
+      "avg_accuracy": 4.545454545454546
+    },
+    "General": {
+      "total": 3,
+      "passed": 0,
+      "failed": 3,
+      "avg_accuracy": 3.0
+    },
+    "": {
+      "total": 22,
+      "passed": 3,
+      "failed": 19,
+      "avg_accuracy": 4.431818181818182
+    },
+    "uniform allowance": {
+      "total": 2,
+      "passed": 0,
+      "failed": 2,
+      "avg_accuracy": 4.75
+    },
+    "Costing and Reporting": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 5.5
+    },
+    "Retail Services": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 6.0
+    },
+    "Quality Management System": {
+      "total": 2,
+      "passed": 0,
+      "failed": 2,
+      "avg_accuracy": 5.25
+    },
+    "Incentive": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1,
+      "avg_accuracy": 2.0
+    },
+    "Attendance": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0,
+      "avg_accuracy": 9.0
+    }
+  }
+}

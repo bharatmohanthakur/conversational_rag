@@ -1,0 +1,233 @@
+{
+  "timestamp": "20260113_192450",
+  "stats": {
+    "total": 10,
+    "passed": 0,
+    "failed": 0,
+    "errors": 0,
+    "avg_accuracy": 0.0,
+    "avg_response_time": 37.32952675819397
+  },
+  "results": [
+    {
+      "question": {
+        "category": "Inurance",
+        "question": "does my insurance covers me outside my residence country?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 2
+      },
+      "actual_answer": "",
+      "response_time": 32.405702352523804,
+      "status_code": 200,
+      "error": null,
+      "sources": [],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "maternity Leave",
+        "question": "can i extend my metirnaty leave ?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 3
+      },
+      "actual_answer": "",
+      "response_time": 32.78890609741211,
+      "status_code": 200,
+      "error": null,
+      "sources": [],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "Remote working",
+        "question": "how can i submit my remote working leave",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 4
+      },
+      "actual_answer": "",
+      "response_time": 35.803412675857544,
+      "status_code": 200,
+      "error": null,
+      "sources": [],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "Road and Promotion",
+        "question": "what is road and when am i eligable for it",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 5
+      },
+      "actual_answer": "",
+      "response_time": 33.69828677177429,
+      "status_code": 200,
+      "error": null,
+      "sources": [],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "Comission",
+        "question": "how to calculate my commision",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 6
+      },
+      "actual_answer": "",
+      "response_time": 38.144641160964966,
+      "status_code": 200,
+      "error": null,
+      "sources": [],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "Recruitment",
+        "question": "Can my brother join the company?",
+        "expected_answer": "to specify the postion ( tables are summarized ) to keep them as they are / and highlt that my brother cant join the company",
+        "owner": "Mais",
+        "row_number": 7
+      },
+      "actual_answer": "",
+      "response_time": 43.806907176971436,
+      "status_code": 200,
+      "error": null,
+      "sources": [],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "Commission",
+        "question": "f the revenue was 50000$ and the comission rate is 2% and i worked 10 hours , what will be my comission?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 8
+      },
+      "actual_answer": "",
+      "response_time": 42.149452686309814,
+      "status_code": 200,
+      "error": null,
+      "sources": [],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "EMPLOYEE RELOCATION",
+        "question": "am relocating to another country what will be my allowance?",
+        "expected_answer": "i prefer to provide it as a table",
+        "owner": "Layan",
+        "row_number": 9
+      },
+      "actual_answer": "",
+      "response_time": 35.74721837043762,
+      "status_code": 200,
+      "error": null,
+      "sources": [],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "EMPLOYEE RELOCATION",
+        "question": "am currently working on another country and am willing to resign what consequences i will be facing ?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 10
+      },
+      "actual_answer": "",
+      "response_time": 42.086992025375366,
+      "status_code": 200,
+      "error": null,
+      "sources": [],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    },
+    {
+      "question": {
+        "category": "EMPLOYEE RELOCATION",
+        "question": "in which currency i get my allowance?",
+        "expected_answer": "",
+        "owner": "Layan",
+        "row_number": 11
+      },
+      "actual_answer": "",
+      "response_time": 36.663748264312744,
+      "status_code": 200,
+      "error": null,
+      "sources": [],
+      "confidence": "unknown",
+      "accuracy_score": null,
+      "semantic_similarity": null,
+      "completeness_score": null,
+      "relevance_score": null,
+      "evaluation_reasoning": null,
+      "improvement_suggestions": null,
+      "issues_found": []
+    }
+  ]
+}

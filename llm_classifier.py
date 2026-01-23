@@ -246,7 +246,8 @@ Respond with JSON:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
-                max_tokens=600
+                max_tokens=600,
+                response_format={"type": "json_object"}
             )
             
             result_text = response.choices[0].message.content.strip()
@@ -365,7 +366,8 @@ Respond with JSON:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
-                max_tokens=400
+                max_tokens=400,
+                response_format={"type": "json_object"}
             )
             
             result_text = response.choices[0].message.content.strip()
@@ -465,7 +467,8 @@ Respond with JSON:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
-                max_tokens=400
+                max_tokens=400,
+                response_format={"type": "json_object"}
             )
             
             result_text = response.choices[0].message.content.strip()
@@ -559,7 +562,8 @@ Respond with JSON:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
-                max_tokens=200
+                max_tokens=200,
+                response_format={"type": "json_object"}
             )
             
             result_text = response.choices[0].message.content.strip()
@@ -613,21 +617,25 @@ Respond with JSON:
 USER QUESTION: "{query}"
 
 ANSWER PROVIDED:
-{answer[:500]}
+{answer}
 
 SOURCES USED:
 {', '.join(source_names)}
 
 CONTEXT USED:
-{context[:500]}
+{context}
 </input>
 
 <task>
 Evaluate:
 1. Does the answer directly address the question?
 2. Is the answer well-supported by the sources?
-3. Is there any missing critical information?
-4. Should the user be warned about anything?
+3. Is the answer complete, or is it cut off/incomplete?
+4. Are sources clearly integrated into the answer text (not just listed at the end)?
+5. Is there any missing critical information that the user needs?
+6. Should the user be warned about anything?
+
+IMPORTANT: If the answer appears truncated, incomplete, or cut off mid-sentence, mark confidence as LOW and include this in the warning_message.
 </task>
 
 <output>
@@ -653,7 +661,8 @@ Respond with JSON:
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.1,
-                max_tokens=400
+                max_tokens=400,
+                response_format={"type": "json_object"}
             )
             
             result_text = response.choices[0].message.content.strip()
@@ -744,10 +753,24 @@ Respond with JSON:
         ]
         
         if confidence.should_show_warning and confidence.warning_message:
-            footer_parts.append(f"⚠️ **Note:** {confidence.warning_message}")
+            # Format warning message more concisely
+            warning_msg = confidence.warning_message
+            # If warning is too long, truncate it
+            if len(warning_msg) > 200:
+                warning_msg = warning_msg[:197] + "..."
+            footer_parts.append(f"⚠️ **Note:** {warning_msg}")
+        
+        # Add missing info if available and confidence is low
+        if confidence.confidence_level == ConfidenceLevel.LOW and confidence.missing_info:
+            missing_list = confidence.missing_info[:3]  # Limit to top 3 missing items
+            if missing_list:
+                missing_text = ", ".join(missing_list)
+                if len(missing_text) > 150:
+                    missing_text = missing_text[:147] + "..."
+                footer_parts.append(f"📋 **Missing Information:** {missing_text}")
         
         if confidence.confidence_level == ConfidenceLevel.LOW:
-            footer_parts.append("💡 **Tip:** Consider contacting HR for verification")
+            footer_parts.append("💡 **Tip:** Consider contacting HR for verification or requesting more specific information")
         
         footer = "\n".join(footer_parts)
         
