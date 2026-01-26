@@ -11,7 +11,7 @@ from typing import Dict, Optional, Any, List
 from dataclasses import dataclass
 from enum import Enum
 import logging
-from openai import AzureOpenAI
+from openai import OpenAI
 import json
 
 logger = logging.getLogger("RAG-Server")  # Use same logger as main server for visibility
@@ -44,7 +44,7 @@ class GeneralQueryHandler:
 
     def __init__(
         self,
-        llm_client: AzureOpenAI,
+        llm_client: OpenAI,
         deployment_name: str,
         classification_model: Optional[str] = None
     ):
@@ -52,7 +52,7 @@ class GeneralQueryHandler:
         Initialize handler.
 
         Args:
-            llm_client: Azure OpenAI client
+            llm_client: OpenAI client
             deployment_name: Deployment name for main responses
             classification_model: Optional separate model for classification (defaults to same)
         """
@@ -143,7 +143,8 @@ Respond ONLY with valid JSON, no other text.
                     {"role": "user", "content": classification_prompt}
                 ],
                 temperature=0.1,  # Low temperature for consistent classification
-                max_tokens=200
+                response_format={"type": "json_object"},
+                timeout=5.0
             )
 
             result_text = response.choices[0].message.content.strip()
@@ -192,20 +193,22 @@ Respond ONLY with valid JSON, no other text.
     def generate_conversational_response(
         self,
         query: str,
-        conversation_history: Optional[List[Dict[str, str]]] = None
-    ) -> str:
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+        stream: bool = False
+    ) -> Any:
         """
         Generate a natural conversational response using LLM with personalized, context-aware responses.
 
         Args:
             query: User query (already classified as general)
             conversation_history: Optional conversation context
+            stream: Whether to stream the response (returns generator) or return full text
 
         Returns:
-            Natural conversational response with personalization
+            str or Iterator[str]: Natural conversational response
         """
         try:
-            logger.info(f"🔄 Generating personalized conversational response for: '{query[:50]}...'")
+            logger.info(f"🔄 Generating personalized conversational response for: '{query[:50]}...' (stream={stream})")
             
             # Build conversation context string for personalization
             context_str = ""
@@ -271,9 +274,14 @@ Stay in character as an HR assistant, not a general chatbot."""
                 model=self.deployment_name,
                 messages=messages,
                 temperature=0.7,  # Slightly higher for natural conversation
-                max_tokens=200  # Increased for more personalized responses
+                max_tokens=200,  # Increased for more personalized responses
+                stream=stream,
+                timeout=10.0
             )
 
+            if stream:
+                return response
+            
             response_text = response.choices[0].message.content.strip()
 
             logger.info(f"🧠 LLM Generated Personalized Conversational Response: {response_text[:150]}")

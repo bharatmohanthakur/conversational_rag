@@ -1,0 +1,33 @@
+Analyzed 972 total requests.
+Found 219 SIMPLE queries.
+Median Time for SIMPLE: 22.067s
+Slow Subset (> Median): 109 requests
+------------------------------------------------------------
+Component                 | Fast (Mean)  | SLOW (Mean)  | Diff    
+-----------------------------------------------------------------
+1_components              | 0.000s      | 0.000s      | +0.00s 
+2_history                 | 0.019s      | 0.288s      | +0.27s 
+3_graphiti_context        | 0.125s      | 0.543s      | +0.42s 
+4_user_profile            | 0.153s      | 0.460s      | +0.31s 
+5_topic_detection         | 0.045s      | 0.402s      | +0.36s 
+6_general_handler         | 0.122s      | 0.403s      | +0.28s 
+7_query_rewrite           | 0.038s      | 0.245s      | +0.21s 
+8_langgraph               | 1.102s      | 6.120s      | +5.02s 🔴
+retrieval_embed           | 0.094s      | 0.428s      | +0.33s 
+retrieval_search          | 0.025s      | 0.178s      | +0.15s 
+retrieval_rerank          | 0.358s      | 1.747s      | +1.39s 🔴
+
+=== CANDIDATE REQUEST IDs FOR ANALYSIS ===
+
+[Top 3 Slowest SIMPLE Queries]
+ID: 24c67637 | Time: 43.14s
+ID: 6cd112c2 | Time: 42.77s
+ID: bfc04944 | Time: 42.41s
+
+[Top 3 Slowest COMPLEX Queries]
+ID: 1e183f5a | Time: 99.10s | Sub-queries: 4
+ID: d02fb224 | Time: 79.17s | Sub-queries: 4
+ID: c78e6407 | Time: 70.48s | Sub-queries: 10
+
+[Median SIMPLE Query]
+ID: 92371433 | Time: 22.07s

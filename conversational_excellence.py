@@ -95,7 +95,7 @@ class ConversationalExcellence:
 
     def __init__(
         self,
-        llm_client: AzureOpenAI,
+        llm_client: OpenAI,
         deployment_name: str,
         personality: str = "warm_professional"
     ):
@@ -356,7 +356,8 @@ class ConversationalExcellence:
                     }
                 ],
                 temperature=0.7,
-                max_tokens=1500
+                max_tokens=1500,
+                response_format={"type": "json_object"}
             )
 
             result_text = response.choices[0].message.content.strip()

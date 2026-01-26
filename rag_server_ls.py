@@ -29,6 +29,9 @@ from dotenv import load_dotenv
 
 from qdrant_client import QdrantClient
 from openai import AzureOpenAI, AsyncAzureOpenAI, AsyncOpenAI
+import langsmith
+from langsmith import traceable
+from langsmith.wrappers import wrap_openai
 
 # Use existing search logic
 import azure_doc_intelligence_qdrant as rag_impl
@@ -173,11 +176,11 @@ QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 COLLECTION_NAME = os.getenv("QDRANT_COLLECTION", "docs_hybrid_azure_azadea_multimodal")
 
 # Initialize Clients
-aoai_client = AzureOpenAI(
+aoai_client = wrap_openai(AzureOpenAI(
     api_key=AZURE_OPENAI_API_KEY,
     azure_endpoint=AZURE_OPENAI_ENDPOINT,
     api_version="2024-02-01",
-)
+))
 
 qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
 
@@ -396,6 +399,7 @@ async def get_graphiti() -> Optional[Graphiti]:
 
 @retry_with_backoff(max_retries=3, initial_delay=1.0, exceptions=(Exception,))
 @with_timeout(timeout_seconds=10.0)
+@traceable(run_type="retriever", name="search_graphiti")
 async def search_graphiti_memory(query: str, num_results: int = 5, memory_types: list = None) -> List[Dict[str, Any]]:
     """
     Search the Graphiti knowledge graph for relevant facts with memory type filtering.
@@ -1154,6 +1158,7 @@ When answering:
 - Keep the answer professional and concise
 """
 
+@traceable(name="rewrite_query_with_history")
 def rewrite_query_with_history(history: List[Dict[str, str]], latest_query: str, user_id: str = None) -> str:
     """
     Rewrites the latest query based on conversation history to make it standalone.
@@ -1672,10 +1677,10 @@ async def _retrieve_single_query(
             collection_name=COLLECTION_NAME,
             prefetch=[
                                 qm.Prefetch(query=dense_q,  using=rag_impl.DENSE_NAME,  limit=20),  # Increased for better coverage
-                                qm.Prefetch(query=sparse_q, using=rag_impl.SPARSE_NAME, limit=20),  # Increased for better coverage
+                                qm.Prefetch(query=sparse_q, using=rag_impl.SPARSE_NAME, limit=7),  # Optimized for speed
             ],
             query=qm.FusionQuery(fusion=qm.Fusion.RRF),
-                            limit=10,  # Increased to 10 documents for better accuracy and completeness
+                            limit=7,  # Fetch only 7
                         )
                     )
                 )
@@ -1762,8 +1767,8 @@ async def _retrieve_single_query(
         # 4. Prepare documents for reranking (if enabled) - Limit to top 10 for reranking
         documents_for_rerank = []
         original_scores = []
-        # Limit to top 10 documents for reranking to reduce token usage
-        top_docs_for_rerank = min(10, len(content_search.points))
+        # Limit to top 7 documents
+        top_docs_for_rerank = min(7, len(content_search.points))
         for p in content_search.points[:top_docs_for_rerank]:
             pl = p.payload or {}
             src_file = pl.get('source_file', 'unknown')
@@ -1782,23 +1787,11 @@ async def _retrieve_single_query(
             })
             original_scores.append(combined_score)
         
-        # 5. Apply reranking if enabled (run in parallel with document processing prep)
-        t0 = datetime.now()
-        if use_advanced_rag and reranker and len(documents_for_rerank) > 0:
-            # Run reranking in executor to not block
-            loop = asyncio.get_event_loop()
-            ranked_docs = await loop.run_in_executor(
-                None,
-                lambda: reranker.rerank(query, documents_for_rerank, original_scores)
-            )
-            top_results = ranked_docs[:7]  # Take top 7 after reranking
-            logger.info(f"Applied reranking: {len(ranked_docs)} documents reranked")
-        else:
-            # Fallback: simple ranking by combined score
-            ranked_results = list(zip(original_scores, documents_for_rerank))
-            ranked_results.sort(key=lambda x: x[0], reverse=True)
-            top_results = [{"content": doc["content"], "metadata": doc["metadata"], "original_score": score, "rerank_score": score, "final_score": score, "rank": i+1} for i, (score, doc) in enumerate(ranked_results[:7])]
-        retrieval_timings["rerank"] = (datetime.now() - t0).total_seconds()
+        # Fallback: Simple ranking (Renamed to fix indentation)
+        simple_ranking = list(zip(original_scores, documents_for_rerank))
+        simple_ranking.sort(key=lambda x: x[0], reverse=True)
+        top_results = [{"content": doc["content"], "metadata": doc["metadata"], "original_score": score, "rerank_score": score, "final_score": score, "rank": i+1} for i, (score, doc) in enumerate(simple_ranking[:7])]
+        retrieval_timings["rerank"] = 0.0
         
         # 6. Build output from ranked results AND retrieve complete documents for top 7 in parallel
         retrieved_images = []
@@ -1907,7 +1900,8 @@ agent_llm = AzureChatOpenAI(
     azure_endpoint=AZURE_OPENAI_ENDPOINT,
     api_key=AZURE_OPENAI_API_KEY,
     temperature=0,
-    max_tokens=10000  # Increased to prevent answer truncation and allow comprehensive answers
+    max_tokens=10000,  # Increased to prevent answer truncation and allow comprehensive answers
+    streaming=True
 )
 
 # --- State Definition ---
@@ -2238,37 +2232,9 @@ async def router_node(state: AgentState):
             logger.info(f"Router: Detected clarification answer for {user_id}: {query[:50]}")
             return {"complexity": "CLARIFICATION_ANSWER"}
     
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", "You are an expert at routing user queries. \n"
-                   "Classify the query as:\n"
-                   "- 'SIMPLE' if it is specific, factual, and can be answered with a single lookup (e.g., 'What is the dress code?', 'How do I apply for leave?', 'What is the notice period?').\n"
-                   "- 'COMPLEX' if it implies multiple steps, comparisons, aggregating information from different sections, or requires a comprehensive guide (e.g., 'Compare the leave policy for sick leave vs annual leave').\n"
-                   "- 'FORMAT' if the user is asking to reformat, summarize differently, or change the presentation of the previous response WITHOUT needing new information (e.g., 'Put that in a table', 'Make it bullet points', 'give me as table', 'provide as points'). CRITICAL: Look for phrases like 'as table', 'as points', 'as list'.\n"
-                   "- 'GENERIC' if the query is ambiguous, too broad, or MISSES CRITICAL CONTEXT (like Country/Location) causing the answer to vary (e.g., 'How many days maternity leave?', 'What are the travel allowances?', 'How can I benefit from insurance?'). These need clarification."),
-        ("user", "{query}")
-    ])
-    
-    # Add error handling with retry
-    max_retries = 2
-    for attempt in range(max_retries):
-        try:
-            chain = prompt | agent_llm.with_structured_output(RouterOutput)
-            result = await chain.ainvoke({"query": query})
-            return {"complexity": result.complexity}
-        except Exception as e:
-            logger.warning(f"Router structured output error (attempt {attempt+1}/{max_retries}): {e}")
-            if attempt == max_retries - 1:
-                # Fallback: use simple heuristics
-                query_lower = query.lower()
-                if any(word in query_lower for word in ["compare", "difference", "vs", "versus", "both"]):
-                    return {"complexity": "COMPLEX"}
-                elif any(word in query_lower for word in ["table", "bullet", "points", "format", "summarize", "as table", "as points", "give me as", "show as", "provide as", "list out", "tabular"]):
-                    return {"complexity": "FORMAT"}
-                elif len(query.split()) < 5 or any(word in query_lower for word in ["how many", "what are", "when", "where"]):
-                    return {"complexity": "GENERIC"}
-                else:
-                    return {"complexity": "SIMPLE"}
-            await asyncio.sleep(0.5)  # Brief delay before retry
+    # FORCE SIMPLE MODE (Optimization)
+    logger.info(f"✅ Router: Forced SIMPLE mode for optimization: {query[:60]}")
+    return {"complexity": "SIMPLE"}
 
 # 2. Simple Handler (Direct RAG)
 class SimpleRAGOutput(BaseModel):
@@ -4562,41 +4528,45 @@ async def query_stream_endpoint(request: QueryRequest):
             conversation_state_machine_instance.transition_to_answering(user_id)
 
             # === Check if this is a general conversational query ===
-            general_response = general_query_handler_instance.handle_query(
+            # Pre-check first (fast)
+            is_general = general_query_handler_instance.is_general_query(
                 query=query_text,
                 conversation_history=history,
                 confidence_threshold=0.7
             )
 
-            if general_response is not None:
-                # Stream general conversational response word-by-word
+            if is_general:
+                # Stream general conversational response directly
                 total_elapsed = (datetime.now() - start_time).total_seconds()
+                
+                # Stream generator
+                response_stream = general_query_handler_instance.generate_conversational_response(
+                    query=query_text,
+                    conversation_history=history,
+                    stream=True
+                )
+                
+                full_response = ""
+                
+                # Stream tokens
+                for chunk in response_stream:
+                    if not chunk.choices: continue
+                    delta = chunk.choices[0].delta
+                    content = delta.content
+                    if content:
+                        full_response += content
+                        yield f"data: {json.dumps({'type': 'token', 'text': content, 'request_id': request_id}, ensure_ascii=False)}\n\n"
+                        await asyncio.sleep(0) # Flush
 
-                # Save to history
+                # Save to history AFTER full generation
                 conv_manager.add_message(user_id, "user", query_text, {
                     "request_id": request_id,
                     "query_type": "general_conversational"
                 })
-                conv_manager.add_message(user_id, "assistant", general_response, {
+                conv_manager.add_message(user_id, "assistant", full_response, {
                     "request_id": request_id,
                     "query_type": "general_conversational"
                 })
-
-                # Stream word-by-word for natural delivery (like Gemini/ChatGPT/Claude)
-                words = general_response.split()
-                for i, word in enumerate(words):
-                    text_chunk = word if i == 0 else f" {word}"
-                    yield f"data: {json.dumps({'type': 'token', 'text': text_chunk}, ensure_ascii=False)}\n\n"
-
-                    # Dynamic delay for natural reading pace
-                    if word.endswith(('.', '!', '?')):
-                        await asyncio.sleep(0.08)  # Pause at sentence end
-                    elif word.endswith((',', ';', ':')):
-                        await asyncio.sleep(0.05)  # Pause at clause end
-                    elif len(word) > 12:
-                        await asyncio.sleep(0.03)  # Longer words
-                    else:
-                        await asyncio.sleep(0.02)  # Normal pace
 
                 # Send metadata
                 final_metadata = {
@@ -4605,14 +4575,14 @@ async def query_stream_endpoint(request: QueryRequest):
                         "request_id": request_id,
                         "query_type": "general_conversational",
                         "elapsed_sec": round(total_elapsed, 3),
-                        "words_streamed": len(words)
+                        "words_streamed": len(full_response.split())
                     }
                 }
                 yield f"data: {json.dumps(final_metadata, ensure_ascii=False)}\n\n"
 
                 log_request(request_id, "✅ GENERAL_QUERY_STREAM_COMPLETE", {
                     "elapsed_sec": round(total_elapsed, 3),
-                    "words_streamed": len(words)
+                    "words_streamed": len(full_response.split())
                 })
                 return
 
@@ -4688,9 +4658,61 @@ async def query_stream_endpoint(request: QueryRequest):
                 "graphiti_temporal_flow": graphiti_context.get('temporal_flow', {})
             }
 
-            # Invoke LangGraph - this is where the heavy lifting happens
+            # Invoke LangGraph with Streaming Events
             # The "🔍 Searching knowledge base..." status stays active during this
-            result = await deep_agent_app.ainvoke(initial_state)
+            
+            answer_text = ""  # Accumulate full answer for logging
+            result = {}       # Final state
+            sources = []      # Extracted sources
+            
+            # Streaming loop
+            async for event in deep_agent_app.astream_events(initial_state, version="v1"):
+                kind = event["event"]
+                
+                # 1. Stream Tokens from LLM Generation
+                if kind == "on_chat_model_stream":
+                    # Filter for generation nodes to avoid streaming internal thoughts
+                    if event.get("metadata", {}).get("langgraph_node") in ["simple_rag", "synthesizer", "answer_relevance", "greeting_response", "clarification_answer_handler", "general_query_handler"]:
+                        content = event["data"]["chunk"].content
+                        if content:
+                            answer_text += content
+                            # Real-time token yield
+                            yield f"data: {json.dumps({'type': 'token', 'text': content, 'request_id': request_id}, ensure_ascii=False)}\n\n"
+                            await asyncio.sleep(0)
+                            
+                # 2. Handle Status Updates (Node Transitions)
+                elif kind == "on_chain_start":
+                    node_name = event.get("name", "")
+                    if node_name == "simple_rag":
+                         yield f"data: {json.dumps({'type': 'status', 'message': '🔍 Searching & Synthesizing...'}, ensure_ascii=False)}\n\n"
+                    elif node_name == "synthesizer":
+                         yield f"data: {json.dumps({'type': 'status', 'message': '✍️ Synthesizing comprehensive answer...'}, ensure_ascii=False)}\n\n"
+                    elif node_name == "clarifier":
+                         yield f"data: {json.dumps({'type': 'status', 'message': '🤔 Formulating clarifying questions...'}, ensure_ascii=False)}\n\n"
+
+                # 3. Capture Sources from State Updates
+                elif kind == "on_chain_end":
+                    # Check if this chain end has updated state with sources
+                    output = event.get("data", {}).get("output")
+                    if isinstance(output, dict) and "sources" in output:
+                        new_sources = output.get("sources", [])
+                        if new_sources and not sources: # First time seeing sources
+                            sources = new_sources
+                            # Stream sources immediately as they become available
+                            yield f"data: {json.dumps({'type': 'progress', 'percentage': 85, 'message': 'Analyzing sources...'}, ensure_ascii=False)}\n\n"
+                            for idx, source in enumerate(sources[:5], 1):
+                                source_name = source.get("source", "Unknown").replace(".md", "").replace("HRD - ", "").strip()
+                                score = source.get("score", 0.0)
+                                yield f"data: {json.dumps({'type': 'source_found', 'index': idx, 'source': source_name, 'score': round(score, 3)}, ensure_ascii=False)}\n\n"
+                                await asyncio.sleep(0.02)
+                    
+                    # Capture final result if it's the main graph end
+                    if event.get("name") == "LangGraph":
+                         result = output if isinstance(output, dict) else {}
+
+            complexity = result.get("complexity", "UNKNOWN")
+            if not answer_text and result.get("final_answer"):
+                answer_text = result.get("final_answer")
 
             # Cleanup: Complete clarification session if turn 3 was finished
             if result.get("clarification_turn_3_complete"):
@@ -4701,31 +4723,7 @@ async def query_stream_endpoint(request: QueryRequest):
                     conversation_state_machine.mark_clarification_done(user_id_from_session)
                     conversation_state_machine.transition_to_answering(user_id_from_session)
                     logger.info(f"Completed clarification session for {user_id_from_session} after turn 3")
-
-            # Progress indicator: 70% - Retrieved results
-            yield f"data: {json.dumps({'type': 'progress', 'percentage': 70, 'message': 'Processing results...'}, ensure_ascii=False)}\n\n"
-            await asyncio.sleep(0)
-
-            answer_text = result.get("final_answer", "No answer generated.")
-            complexity = result.get("complexity", "UNKNOWN")
-            sources = result.get("sources", [])
-
-            # Progress indicator: 85% - Analyzing sources
-            yield f"data: {json.dumps({'type': 'progress', 'percentage': 85, 'message': 'Analyzing sources...'}, ensure_ascii=False)}\n\n"
-            await asyncio.sleep(0)
-
-            # ============================================================================
-            # REAL-TIME SOURCE STREAMING (like Gemini's Search Grounding)
-            # ============================================================================
-            # Stream sources as they're found to give immediate feedback
-            if sources:
-                for idx, source in enumerate(sources[:5], 1):  # Stream top 5 sources
-                    source_name = source.get("source", "Unknown").replace(".md", "").replace("HRD - ", "").strip()
-                    score = source.get("score", 0.0)
-                    yield f"data: {json.dumps({'type': 'source_found', 'index': idx, 'source': source_name, 'score': round(score, 3)}, ensure_ascii=False)}\n\n"
-                    await asyncio.sleep(0)  # Force immediate flush
-                    await asyncio.sleep(0.05)  # Brief delay between sources
-
+            
             # Log completion
             log_request(request_id, "🤖 DEEP_AGENT_END", {
                 "elapsed_sec": round((datetime.now() - start_time).total_seconds(), 3),
@@ -4945,83 +4943,7 @@ async def query_stream_endpoint(request: QueryRequest):
             # ============================================================================
             # BEST-IN-CLASS STREAMING (like Gemini, ChatGPT, Claude)
             # ============================================================================
-            # Enhanced streaming with code block detection and formatting hints
-            import re
 
-            # Detect code blocks in the response
-            code_block_pattern = r'```(\w+)?\n(.*?)```'
-            code_blocks = list(re.finditer(code_block_pattern, final_answer_with_confidence, re.DOTALL))
-
-            token_count = 0  # Track tokens for usage display
-
-            # If no code blocks, use simple word-by-word streaming
-            if not code_blocks:
-                words = final_answer_with_confidence.split()
-                for i, word in enumerate(words):
-                    text_chunk = word if i == 0 else f" {word}"
-                    yield f"data: {json.dumps({'type': 'token', 'text': text_chunk}, ensure_ascii=False)}\n\n"
-                    token_count += 1
-
-                    # Dynamic delay for natural reading pace
-                    if word.endswith(('.', '!', '?')):
-                        await asyncio.sleep(0.08)  # Pause at sentence end
-                    elif word.endswith((',', ';', ':')):
-                        await asyncio.sleep(0.05)  # Pause at clause end
-                    elif len(word) > 12:
-                        await asyncio.sleep(0.03)  # Longer words need more time
-                    else:
-                        await asyncio.sleep(0.02)  # Normal pace
-            else:
-                # Stream with code block detection
-                last_end = 0
-                for match in code_blocks:
-                    # Stream text before code block
-                    text_before = final_answer_with_confidence[last_end:match.start()]
-                    if text_before:
-                        words = text_before.split()
-                        for i, word in enumerate(words):
-                            text_chunk = word if i == 0 and last_end == 0 else f" {word}"
-                            yield f"data: {json.dumps({'type': 'token', 'text': text_chunk}, ensure_ascii=False)}\n\n"
-                            token_count += 1
-                            if word.endswith(('.', '!', '?')):
-                                await asyncio.sleep(0.08)
-                            elif word.endswith((',', ';', ':')):
-                                await asyncio.sleep(0.05)
-                            else:
-                                await asyncio.sleep(0.02)
-
-                    # Send code block metadata
-                    language = match.group(1) or "plaintext"
-                    code_content = match.group(2)
-
-                    # Signal code block start with language
-                    yield f"data: {json.dumps({'type': 'code_block_start', 'language': language}, ensure_ascii=False)}\n\n"
-                    await asyncio.sleep(0)
-
-                    # Stream code content (faster, no delays)
-                    yield f"data: {json.dumps({'type': 'code', 'text': code_content}, ensure_ascii=False)}\n\n"
-                    token_count += len(code_content.split())
-                    await asyncio.sleep(0.1)  # Brief pause after code
-
-                    # Signal code block end
-                    yield f"data: {json.dumps({'type': 'code_block_end'}, ensure_ascii=False)}\n\n"
-                    await asyncio.sleep(0)
-
-                    last_end = match.end()
-
-                # Stream remaining text after last code block
-                text_after = final_answer_with_confidence[last_end:]
-                if text_after:
-                    words = text_after.split()
-                    for word in words:
-                        yield f"data: {json.dumps({'type': 'token', 'text': f' {word}'}, ensure_ascii=False)}\n\n"
-                        token_count += 1
-                        if word.endswith(('.', '!', '?')):
-                            await asyncio.sleep(0.08)
-                        elif word.endswith((',', ';', ':')):
-                            await asyncio.sleep(0.05)
-                        else:
-                            await asyncio.sleep(0.02)
 
             # Send comprehensive final metadata with token usage and citations
             final_metadata = {
@@ -5109,5 +5031,5 @@ async def shutdown_event():
 
 if __name__ == "__main__":
     import uvicorn
-    # Using port 8088 for testing
-    uvicorn.run(app, host="0.0.0.0", port=8060)
+    # Using port 8043 as requested
+    uvicorn.run(app, host="0.0.0.0", port=8043)

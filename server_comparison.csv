@@ -1,0 +1,11 @@
+query,time_8060_sec,time_8043_sec,speedup,len_8060,len_8043
+"give me the disciplinary matrix",21.996834320,17.823500208,1.23,3853,4055
+"compare sick leave and annual leave",45.584915033,24.768327323,1.84,8497,4515
+"what is the notice period",17.972096513,14.412951400,1.24,2563,3048
+"how to apply for medical leave",34.770523774,25.543068243,1.36,4324,3978
+"what are the travel allowances",21.906960330,22.977083874,.95,4072,4894
+"explain the performance review process",29.807495497,20.063641710,1.48,5366,3209
+"what is the probation period",34.352494931,23.280436039,1.47,2471,2987
+"how does overtime work",43.561693492,26.369492892,1.65,4479,2953
+"what is the dress code",35.025833244,28.424828076,1.23,2557,2668
+"what are employee benefits in Egypt",39.603100545,26.972854223,1.46,3907,3774

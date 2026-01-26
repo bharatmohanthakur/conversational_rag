@@ -28,7 +28,9 @@ from pydantic import BaseModel
 from dotenv import load_dotenv
 
 from qdrant_client import QdrantClient
-from openai import AzureOpenAI, AsyncAzureOpenAI, AsyncOpenAI
+from openai import AzureOpenAI, AsyncAzureOpenAI, AsyncOpenAI, OpenAI
+from langchain_openai import ChatOpenAI
+from langsmith.wrappers import wrap_openai
 
 # Use existing search logic
 import azure_doc_intelligence_qdrant as rag_impl
@@ -72,6 +74,7 @@ from graphiti_core.driver.neo4j_driver import Neo4jDriver
 from graphiti_core.nodes import EpisodeType
 from graphiti_core.llm_client import LLMConfig
 from graphiti_core.llm_client.azure_openai_client import AzureOpenAILLMClient
+from graphiti_core.llm_client.openai_client import OpenAIClient
 from graphiti_core.embedder.openai import OpenAIEmbedder, OpenAIEmbedderConfig
 from graphiti_core.cross_encoder.openai_reranker_client import OpenAIRerankerClient
 
@@ -157,6 +160,16 @@ AZURE_OPENAI_API_VERSION = os.getenv("AZURE_OPENAI_API_VERSION", "2025-03-01-pre
 AZURE_CHAT_DEPLOYMENT = os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT", "gpt-4.1")
 AZURE_EMBEDDING_DEPLOYMENT = os.getenv("AZURE_OPENAI_EMBEDDING_DEPLOYMENT_NAME", "text-embedding-3-small")
 
+# Initialize Clients
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash")
+
+# Override global deployment name used throughout the app
+AZURE_CHAT_DEPLOYMENT = OPENROUTER_MODEL
+
+if not OPENROUTER_API_KEY:
+    logger.warning("OPENROUTER_API_KEY is not set. Requests will fail.")
+
 # Neo4j for Graphiti
 NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
@@ -173,10 +186,9 @@ QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 COLLECTION_NAME = os.getenv("QDRANT_COLLECTION", "docs_hybrid_azure_azadea_multimodal")
 
 # Initialize Clients
-aoai_client = AzureOpenAI(
-    api_key=AZURE_OPENAI_API_KEY,
-    azure_endpoint=AZURE_OPENAI_ENDPOINT,
-    api_version="2024-02-01",
+aoai_client = OpenAI(
+    api_key=OPENROUTER_API_KEY,
+    base_url="https://openrouter.ai/api/v1",
 )
 
 qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
@@ -213,23 +225,23 @@ def get_enhanced_components():
     if _conv_manager is None:
         _conv_manager = get_conversation_manager()
         _clarification_tracker = ClarificationTracker(_conv_manager)
-        _conversation_summarizer = ConversationSummarizer(aoai_client, deployment_name=AZURE_CHAT_DEPLOYMENT)
+        _conversation_summarizer = ConversationSummarizer(aoai_client, deployment_name=OPENROUTER_MODEL)
         _self_evaluator = SelfEvaluator(aoai_client)
         _quality_gate = AnswerQualityGate(_self_evaluator)
         # Initialize RAG technique modules
-        _contextual_compressor = ContextualCompressor(aoai_client, deployment_name=AZURE_CHAT_DEPLOYMENT)
+        _contextual_compressor = ContextualCompressor(aoai_client, deployment_name=OPENROUTER_MODEL)
         # Set top_k to 10 to return all reranked docs (we limit input to 10, then take top 7 after)
-        _reranker = Reranker(aoai_client, deployment_name=AZURE_CHAT_DEPLOYMENT, top_k=10)
-        _corrective_rag = CorrectiveRAG(aoai_client, deployment_name=AZURE_CHAT_DEPLOYMENT)
+        _reranker = Reranker(aoai_client, deployment_name=OPENROUTER_MODEL, top_k=10)
+        _corrective_rag = CorrectiveRAG(aoai_client, deployment_name=OPENROUTER_MODEL)
         # Initialize general query handler for conversational queries
         _general_query_handler = GeneralQueryHandler(
             llm_client=aoai_client,
-            deployment_name=AZURE_CHAT_DEPLOYMENT
+            deployment_name=OPENROUTER_MODEL
         )
         # Initialize conversational excellence for natural responses
         _conversational_excellence = ConversationalExcellence(
             llm_client=aoai_client,
-            deployment_name=AZURE_CHAT_DEPLOYMENT,
+            deployment_name=OPENROUTER_MODEL,
             personality="warm_professional"
         )
         # Initialize adaptive retriever with run_search_for_deep_agent as retrieval function
@@ -258,13 +270,13 @@ def get_enhanced_components():
 
         init_query_processor(
             llm_client=aoai_client,
-            deployment_name=AZURE_CHAT_DEPLOYMENT
+            deployment_name=OPENROUTER_MODEL
         )
 
         # 2. Initialize optimization components
         _best_guess_answering = BestGuessAnswering(
             llm_client=aoai_client,
-            deployment_name=AZURE_CHAT_DEPLOYMENT
+            deployment_name=OPENROUTER_MODEL
         )
 
         _user_profile_tracker = UserProfileTracker(
@@ -279,12 +291,12 @@ def get_enhanced_components():
 
         _unified_clarification_handler = ClarificationHandler(
             llm_client=aoai_client,
-            deployment_name=AZURE_CHAT_DEPLOYMENT,
+            deployment_name=OPENROUTER_MODEL,
             clarification_tracker=_clarification_tracker
         )
 
         # Initialize LLM Context Classifier with CoT reasoning
-        init_llm_context_classifier(aoai_client, AZURE_CHAT_DEPLOYMENT)
+        init_llm_context_classifier(aoai_client, OPENROUTER_MODEL)
         _llm_context_classifier = get_llm_context_classifier()
 
         # Initialize comprehensive LLM Classifier (zero hardcoding)
@@ -362,13 +374,23 @@ async def get_graphiti() -> Optional[Graphiti]:
             )
             logger.info(f"🔗 Connecting to Neo4j: {NEO4J_URI} (database: {NEO4J_DATABASE})")
             
-            # Use custom driver with AzureOpenAILLMClient
+            # Use custom driver with OpenAIClient (configured for OpenRouter)
+            # Create a dedicated client for Graphiti LLM interactions
+            graphiti_llm_client = AsyncOpenAI(
+                api_key=OPENROUTER_API_KEY,
+                base_url="https://openrouter.ai/api/v1",
+            )
+            
             graphiti_instance = Graphiti(
                 graph_driver=neo4j_driver,
-                llm_client=AzureOpenAILLMClient(
-                    azure_client=llm_client_azure,
-                    config=azure_llm_config,
-                    reasoning=None,  # Azure OpenAI doesn't support reasoning.effort
+                llm_client=OpenAIClient(
+                    client=graphiti_llm_client,
+                    config=LLMConfig(
+                        model=OPENROUTER_MODEL,
+                        # Use a smaller/cheaper model for lighter tasks if needed, or same model
+                        small_model=OPENROUTER_MODEL,
+                    ),
+                    reasoning=None,
                     verbosity=None,
                 ),
                 embedder=OpenAIEmbedder(
@@ -1901,11 +1923,10 @@ async def _retrieve_single_query(
 
 
 # --- LLM Client for Agent ---
-agent_llm = AzureChatOpenAI(
-    azure_deployment=AZURE_CHAT_DEPLOYMENT,
-    api_version=AZURE_OPENAI_API_VERSION,
-    azure_endpoint=AZURE_OPENAI_ENDPOINT,
-    api_key=AZURE_OPENAI_API_KEY,
+agent_llm = ChatOpenAI(
+    model=OPENROUTER_MODEL,
+    api_key=OPENROUTER_API_KEY,
+    base_url="https://openrouter.ai/api/v1",
     temperature=0,
     max_tokens=10000  # Increased to prevent answer truncation and allow comprehensive answers
 )
@@ -1999,8 +2020,9 @@ async def greeting_detection_node(state: AgentState):
             else:
                 conversation_history = conversation_history[-5:]  # Last 5 messages for context
             
-            # Use LLM classifier with conversation history
-            result = llm_classifier.classify_query(
+            # Use LLM classifier with conversation history (async wrap)
+            result = await asyncio.to_thread(
+                llm_classifier.classify_query,
                 query=query,
                 conversation_context=conversation_history,
                 active_clarification=False
@@ -2712,15 +2734,23 @@ async def format_handler_node(state: AgentState):
                    "2. **ONLY CHANGE FORMAT**: Do NOT add new information or make up details\n"
                    "3. **EXTRACT EXACT SPECIFICS**: If reformatting to a table, extract exact numbers, amounts, percentages, dates\n"
                    "4. **COMPLETE REFORMATTING**: Ensure the reformatted output is complete - don't cut off mid-table or mid-list\n"
-                   "5. **CLEAR STRUCTURE**: If making a table, use clear headers; if making bullets, organize logically\n\n"
+                   "5. **CLEAR STRUCTURE**: If making a table, use clear headers; if making bullets, organize logically\n"
+                   "6. **NO REPETITION**: Do NOT repeat the answer. Output the formatted content ONCE and stop. Do NOT loop.\n\n"
                    "Examples:\n"
                    "- 'as table' → Create markdown table with | headers | and rows\n"
                    "- 'as points' → Create bullet points with • or - prefix\n"
                    "- 'summarize' → Condense while keeping all key facts"),
         ("user", f"Previous Response:\n{previous_response}\n\nUser Request: {query}\n\nReformat the previous response according to the user's request.")
     ]
-    response = await agent_llm.ainvoke(messages)
-    return {"final_answer": response.content}
+    logger.info(f"⏳ FORMAT HANDLER: Starting LLM generation for {len(previous_response)} chars...")
+    try:
+        response = await agent_llm.ainvoke(messages)
+        content = response.content
+        logger.info(f"✅ FORMAT HANDLER: Generation complete. Output length: {len(content) if content else 0} chars")
+        return {"final_answer": content}
+    except BaseException as e:
+        logger.error(f"❌ FORMAT HANDLER CRITICAL ERROR ({type(e).__name__}): {e}")
+        return {"final_answer": previous_response}
 
 # 7. Clarifier Node (GENERIC Path - Ask clarifying questions based on RAG data)
 class ClarificationOutput(BaseModel):
@@ -3966,7 +3996,8 @@ async def query_endpoint(request: QueryRequest):
         # === NEW: Check if this is a general conversational query (not knowledge-based) ===
         # Use LLM-based classification instead of hardcoded patterns
         t0 = datetime.now()
-        general_response = general_query_handler_instance.handle_query(
+        general_response = await asyncio.to_thread(
+            general_query_handler_instance.handle_query,
             query=query_text,
             conversation_history=history,
             confidence_threshold=0.7
@@ -5110,4 +5141,4 @@ async def shutdown_event():
 if __name__ == "__main__":
     import uvicorn
     # Using port 8088 for testing
-    uvicorn.run(app, host="0.0.0.0", port=8060)
+    uvicorn.run(app, host="0.0.0.0", port=7073)

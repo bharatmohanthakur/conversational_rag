@@ -1,100 +1,104 @@
 """
-LLM Classifier - Zero Hardcoding Approach
+LLM Classifier - Zero Hardcoding Approach (Pydantic Edition)
 Uses LLM for ALL classification tasks with Chain of Thought reasoning.
-No regex patterns, no hardcoded lists - pure LLM intelligence.
+Enforces structured outputs using Pydantic models and OpenAI tools.
 """
 
 import logging
 import json
-from typing import Dict, Any, Optional, List, Tuple
-from dataclasses import dataclass, field
+from typing import Dict, Any, Optional, List, Tuple, Type, Union
 from enum import Enum
-from openai import AzureOpenAI
+from openai import OpenAI
 import hashlib
 from datetime import datetime, timedelta
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger("LLMClassifier")
 
 
-class ConfidenceLevel(Enum):
+class ConfidenceLevel(str, Enum):
     """Confidence levels for answers."""
     HIGH = "high"
     MEDIUM = "medium"
     LOW = "low"
 
 
-@dataclass
-class QueryClassificationResult:
+class QueryClassificationResult(BaseModel):
     """Comprehensive result from LLM query classification."""
     # Primary classification
-    query_type: str  # greeting, question, command, clarification_answer, casual
-    complexity: str  # simple, moderate, complex
-    confidence: float  # 0-1
+    query_type: str = Field(description="Type of query: greeting, question, command, clarification_answer, casual")
+    complexity: str = Field(description="Complexity level: simple, moderate, complex")
+    confidence: float = Field(description="Classification confidence 0.0-1.0")
     
     # Boolean flags
-    is_greeting: bool = False
-    is_question: bool = False
-    is_clarification_answer: bool = False
-    is_casual: bool = False
-    is_frustrated: bool = False
+    is_greeting: bool = Field(default=False, description="Is this a greeting?")
+    is_question: bool = Field(default=False, description="Is this a question?")
+    is_clarification_answer: bool = Field(default=False, description="Is this answering a clarification question?")
+    is_casual: bool = Field(default=False, description="Is this casual conversation?")
+    is_frustrated: bool = Field(default=False, description="Is the user showing frustration?")
     
     # Clarification context
-    requires_clarification: bool = False
-    missing_context: List[str] = field(default_factory=list)
-    suggested_assumptions: Dict[str, str] = field(default_factory=dict)
+    requires_clarification: bool = Field(default=False, description="Does this query need clarification?")
+    missing_context: List[str] = Field(default_factory=list, description="List of missing information")
+    suggested_assumptions: Dict[str, str] = Field(default_factory=dict, description="Assumptions we can make")
     
     # CoT reasoning
-    reasoning: str = ""
+    reasoning: str = Field(default="", description="Step-by-step reasoning for classification")
 
 
-@dataclass
-class UserProfileInfo:
+class UserProfileInfo(BaseModel):
     """Extracted user profile information."""
-    role: Optional[str] = None
-    country: Optional[str] = None
-    department: Optional[str] = None
-    brand: Optional[str] = None
-    employment_type: Optional[str] = None
-    confidence: float = 0.0
-    reasoning: str = ""
+    role: Optional[str] = Field(default=None, description="Job title or role")
+    country: Optional[str] = Field(default=None, description="Country or location")
+    department: Optional[str] = Field(default=None, description="Department name")
+    brand: Optional[str] = Field(default=None, description="Brand name")
+    employment_type: Optional[str] = Field(default=None, description="Employment type (Full-time, etc)")
+    confidence: float = Field(default=0.0, description="Extraction confidence")
+    reasoning: str = Field(default="", description="Extraction reasoning")
 
 
-@dataclass
-class TopicChangeResult:
+class TopicChangeResult(BaseModel):
     """Result from topic change detection."""
-    is_major_change: bool = False
-    is_minor_shift: bool = False
-    similarity: float = 1.0
-    new_topic: Optional[str] = None
-    old_topic: Optional[str] = None
-    should_acknowledge: bool = False
-    acknowledgment: Optional[str] = None
-    reasoning: str = ""
+    is_major_change: bool = Field(default=False, description="Is this a major topic change?")
+    is_minor_shift: bool = Field(default=False, description="Is this a minor topic shift?")
+    similarity: float = Field(default=1.0, description="Semantic similarity to previous topic 0-1")
+    new_topic: Optional[str] = Field(default=None, description=" The new detected topic")
+    old_topic: Optional[str] = Field(default=None, description="The previous topic")
+    should_acknowledge: bool = Field(default=False, description="Should we acknowledge the change?")
+    acknowledgment: Optional[str] = Field(default=None, description="Acknowledgment message")
+    reasoning: str = Field(default="", description="Reasoning for decision")
 
 
-@dataclass
-class AnswerConfidenceResult:
+class AnswerConfidenceResult(BaseModel):
     """Result from answer confidence assessment."""
-    confidence_level: ConfidenceLevel = ConfidenceLevel.MEDIUM
-    confidence_score: float = 0.5
-    source_quality: str = "unknown"
-    has_sufficient_context: bool = True
-    missing_info: List[str] = field(default_factory=list)
-    suggested_assumptions: Dict[str, str] = field(default_factory=dict)
-    should_show_warning: bool = False
-    warning_message: Optional[str] = None
-    reasoning: str = ""
+    confidence_level: ConfidenceLevel = Field(default=ConfidenceLevel.MEDIUM, description="Overall confidence level")
+    confidence_score: float = Field(default=0.5, description="Numerical confidence score 0-1")
+    source_quality: str = Field(default="unknown", description="Quality assessment of sources")
+    has_sufficient_context: bool = Field(default=True, description="Do we have enough context?")
+    missing_info: List[str] = Field(default_factory=list, description="List of missing information")
+    suggested_assumptions: Dict[str, str] = Field(default_factory=dict, description="Assumptions made")
+    should_show_warning: bool = Field(default=False, description="Should we show a warning to user?")
+    warning_message: Optional[str] = Field(default=None, description="Warning message content")
+    reasoning: str = Field(default="", description="Confidence assessment reasoning")
+
+
+class FrustrationResult(BaseModel):
+    """Result from frustration detection."""
+    is_frustrated: bool = Field(default=False, description="Is user frustrated?")
+    confidence: float = Field(default=0.0, description="Confidence in detection")
+    reasoning: str = Field(default="", description="Reasoning for detection")
 
 
 class LLMClassifier:
     """
     LLM-based classifier for all classification tasks.
     Zero hardcoding - uses LLM for all decisions.
+    Uses Pydantic + Tools for robust structured output.
     """
     
     def __init__(
         self,
-        aoai_client: AzureOpenAI,
+        aoai_client: OpenAI,
         deployment_name: str,
         cache_enabled: bool = True,
         cache_ttl_seconds: int = 3600
@@ -103,7 +107,7 @@ class LLMClassifier:
         Initialize LLM classifier.
         
         Args:
-            aoai_client: Azure OpenAI client
+            aoai_client: OpenAI, client
             deployment_name: Model deployment name
             cache_enabled: Enable caching for repeated queries
             cache_ttl_seconds: Cache time-to-live
@@ -114,7 +118,7 @@ class LLMClassifier:
         self.cache_ttl = cache_ttl_seconds
         self._cache: Dict[str, Tuple[Any, datetime]] = {}
         
-        logger.info("Initialized LLM Classifier with zero hardcoding approach")
+        logger.info("Initialized LLM Classifier with Pydantic structured outputs")
     
     def _get_cache_key(self, *args) -> str:
         """Generate cache key from arguments."""
@@ -138,7 +142,52 @@ class LLMClassifier:
         """Cache a result."""
         if self.cache_enabled:
             self._cache[key] = (value, datetime.now())
-    
+
+    def _call_llm_with_tools(
+        self,
+        prompt: str,
+        result_model: Type[BaseModel],
+        temperature: float = 0.1,
+        max_tokens: int = 600
+    ) -> Any:
+        """
+        Generic helper to call LLM with tools and parse result into Pydantic model.
+        """
+        # Convert Pydantic model to function schema
+        schema = result_model.model_json_schema()
+        function_name = f"return_{result_model.__name__.lower()}"
+        
+        tool_definition = {
+            "type": "function",
+            "function": {
+                "name": function_name,
+                "description": schema.get("description", f"Return structured {result_model.__name__}"),
+                "parameters": schema
+            }
+        }
+        
+        try:
+            response = self.client.chat.completions.create(
+                model=self.deployment,
+                messages=[
+                    {"role": "system", "content": "You are a precise classifier. Call the provided function to return your analysis."},
+                    {"role": "user", "content": prompt}
+                ],
+                tools=[tool_definition],
+                tool_choice={"type": "function", "function": {"name": function_name}},
+                temperature=temperature,
+                max_tokens=max_tokens,
+                timeout=10.0
+            )
+            
+            tool_call = response.choices[0].message.tool_calls[0]
+            function_args = json.loads(tool_call.function.arguments)
+            return result_model.model_validate(function_args)
+            
+        except Exception as e:
+            logger.error(f"LLM tool call failed: {e}")
+            raise e
+
     def classify_query(
         self,
         query: str,
@@ -147,19 +196,7 @@ class LLMClassifier:
         clarification_question: Optional[str] = None,
         original_query: Optional[str] = None
     ) -> QueryClassificationResult:
-        """
-        Comprehensive query classification using LLM.
-        
-        Args:
-            query: User's current query
-            conversation_context: Recent conversation history
-            active_clarification: Is there an active clarification session?
-            clarification_question: The clarification question asked (if any)
-            original_query: The original query (if in clarification flow)
-            
-        Returns:
-            QueryClassificationResult with all classification details
-        """
+        """Comprehensive query classification using LLM with structured output."""
         cache_key = self._get_cache_key("classify", query, active_clarification, clarification_question)
         cached = self._get_cached(cache_key)
         if cached:
@@ -181,7 +218,7 @@ ACTIVE CLARIFICATION SESSION:
 - User's Current Response: {query}
 """
         
-        prompt = f"""You are an intelligent query classifier. Analyze the user's input and classify it comprehensively.
+        prompt = f"""Analyze the user's input and classify it comprehensively.
 
 <input>
 USER QUERY: "{query}"
@@ -192,7 +229,7 @@ CONVERSATION CONTEXT:
 </input>
 
 <task>
-Think step by step (Chain of Thought):
+Think step by step in the reasoning field:
 
 1. IDENTIFY QUERY TYPE:
    - greeting: User is greeting (hi, hello, hey, good morning, etc.)
@@ -219,61 +256,9 @@ Think step by step (Chain of Thought):
    - What information would help answer this query?
    - Country, role, employment type, specific policy area?
 </task>
-
-<output>
-Respond with JSON:
-{{
-    "query_type": "greeting|question|command|clarification_answer|casual",
-    "complexity": "simple|moderate|complex",
-    "confidence": 0.0-1.0,
-    "is_greeting": true/false,
-    "is_question": true/false,
-    "is_clarification_answer": true/false,
-    "is_casual": true/false,
-    "is_frustrated": true/false,
-    "requires_clarification": true/false,
-    "missing_context": ["list", "of", "missing", "info"],
-    "suggested_assumptions": {{"key": "value"}},
-    "reasoning": "Step by step reasoning..."
-}}
-</output>"""
-
+"""
         try:
-            response = self.client.chat.completions.create(
-                model=self.deployment,
-                messages=[
-                    {"role": "system", "content": "You are an expert query classifier. Always respond with valid JSON."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.1,
-                max_tokens=600,
-                response_format={"type": "json_object"}
-            )
-            
-            result_text = response.choices[0].message.content.strip()
-            
-            # Parse JSON
-            if "```json" in result_text:
-                result_text = result_text.split("```json")[1].split("```")[0].strip()
-            elif "```" in result_text:
-                result_text = result_text.split("```")[1].split("```")[0].strip()
-            
-            data = json.loads(result_text)
-            
-            result = QueryClassificationResult(
-                query_type=data.get("query_type", "question"),
-                complexity=data.get("complexity", "simple"),
-                confidence=data.get("confidence", 0.8),
-                is_greeting=data.get("is_greeting", False),
-                is_question=data.get("is_question", False),
-                is_clarification_answer=data.get("is_clarification_answer", False),
-                is_casual=data.get("is_casual", False),
-                is_frustrated=data.get("is_frustrated", False),
-                requires_clarification=data.get("requires_clarification", False),
-                missing_context=data.get("missing_context", []),
-                suggested_assumptions=data.get("suggested_assumptions", {}),
-                reasoning=data.get("reasoning", "")
-            )
+            result = self._call_llm_with_tools(prompt, QueryClassificationResult)
             
             logger.info(f"🧠 LLM Classification: type={result.query_type}, "
                        f"greeting={result.is_greeting}, clarification_answer={result.is_clarification_answer}, "
@@ -298,17 +283,7 @@ Respond with JSON:
         text: str,
         conversation_history: Optional[List[Dict]] = None
     ) -> UserProfileInfo:
-        """
-        Extract user profile information using LLM.
-        No hardcoded patterns - LLM understands natural language.
-        
-        Args:
-            text: Text to extract profile info from
-            conversation_history: Recent conversation for context
-            
-        Returns:
-            UserProfileInfo with extracted details
-        """
+        """Extract user profile information using structured output."""
         cache_key = self._get_cache_key("profile", text)
         cached = self._get_cached(cache_key)
         if cached:
@@ -344,50 +319,9 @@ RULES:
 - Be flexible with phrasing
 - Only extract if reasonably certain
 </task>
-
-<output>
-Respond with JSON:
-{{
-    "role": "extracted role or null",
-    "country": "extracted country or null",
-    "department": "extracted department or null",
-    "brand": "extracted brand or null",
-    "employment_type": "extracted type or null",
-    "confidence": 0.0-1.0,
-    "reasoning": "explanation..."
-}}
-</output>"""
-
+"""
         try:
-            response = self.client.chat.completions.create(
-                model=self.deployment,
-                messages=[
-                    {"role": "system", "content": "You are an expert at extracting user profile information. Always respond with valid JSON."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.1,
-                max_tokens=400,
-                response_format={"type": "json_object"}
-            )
-            
-            result_text = response.choices[0].message.content.strip()
-            
-            if "```json" in result_text:
-                result_text = result_text.split("```json")[1].split("```")[0].strip()
-            elif "```" in result_text:
-                result_text = result_text.split("```")[1].split("```")[0].strip()
-            
-            data = json.loads(result_text)
-            
-            result = UserProfileInfo(
-                role=data.get("role") if data.get("role") and data.get("role") != "null" else None,
-                country=data.get("country") if data.get("country") and data.get("country") != "null" else None,
-                department=data.get("department") if data.get("department") and data.get("department") != "null" else None,
-                brand=data.get("brand") if data.get("brand") and data.get("brand") != "null" else None,
-                employment_type=data.get("employment_type") if data.get("employment_type") and data.get("employment_type") != "null" else None,
-                confidence=data.get("confidence", 0.8),
-                reasoning=data.get("reasoning", "")
-            )
+            result = self._call_llm_with_tools(prompt, UserProfileInfo)
             
             extracted = [f for f in ["role", "country", "department", "brand"] 
                         if getattr(result, f)]
@@ -407,17 +341,7 @@ Respond with JSON:
         recent_queries: List[str],
         current_topic: Optional[str] = None
     ) -> TopicChangeResult:
-        """
-        Detect topic changes using LLM semantic understanding.
-        
-        Args:
-            current_query: Current user query
-            recent_queries: Recent user queries for context
-            current_topic: Currently tracked topic (if any)
-            
-        Returns:
-            TopicChangeResult with change details
-        """
+        """Detect topic changes using structured output."""
         cache_key = self._get_cache_key("topic", current_query, str(recent_queries[:3]))
         cached = self._get_cached(cache_key)
         if cached:
@@ -444,52 +368,9 @@ Determine:
 4. What's the new topic if changed?
 5. Should we acknowledge the topic change?
 </task>
-
-<output>
-Respond with JSON:
-{{
-    "is_major_change": true/false,
-    "is_minor_shift": true/false,
-    "similarity": 0.0-1.0,
-    "new_topic": "detected topic or null",
-    "old_topic": "previous topic or null",
-    "should_acknowledge": true/false,
-    "acknowledgment": "Acknowledgment message if needed",
-    "reasoning": "explanation..."
-}}
-</output>"""
-
+"""
         try:
-            response = self.client.chat.completions.create(
-                model=self.deployment,
-                messages=[
-                    {"role": "system", "content": "You are an expert at understanding conversation flow. Always respond with valid JSON."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.1,
-                max_tokens=400,
-                response_format={"type": "json_object"}
-            )
-            
-            result_text = response.choices[0].message.content.strip()
-            
-            if "```json" in result_text:
-                result_text = result_text.split("```json")[1].split("```")[0].strip()
-            elif "```" in result_text:
-                result_text = result_text.split("```")[1].split("```")[0].strip()
-            
-            data = json.loads(result_text)
-            
-            result = TopicChangeResult(
-                is_major_change=data.get("is_major_change", False),
-                is_minor_shift=data.get("is_minor_shift", False),
-                similarity=data.get("similarity", 1.0),
-                new_topic=data.get("new_topic"),
-                old_topic=data.get("old_topic"),
-                should_acknowledge=data.get("should_acknowledge", False),
-                acknowledgment=data.get("acknowledgment"),
-                reasoning=data.get("reasoning", "")
-            )
+            result = self._call_llm_with_tools(prompt, TopicChangeResult)
             
             if result.is_major_change:
                 logger.info(f"🔄 LLM Topic Change: {result.old_topic} → {result.new_topic}")
@@ -506,16 +387,7 @@ Respond with JSON:
         query: str,
         conversation_history: Optional[List[Dict]] = None
     ) -> Tuple[bool, float, str]:
-        """
-        Detect user frustration using LLM understanding.
-        
-        Args:
-            query: User's current query
-            conversation_history: Recent conversation for context
-            
-        Returns:
-            Tuple of (is_frustrated, confidence, reasoning)
-        """
+        """Detect user frustration using structured output."""
         cache_key = self._get_cache_key("frustration", query)
         cached = self._get_cached(cache_key)
         if cached:
@@ -544,47 +416,15 @@ Look for signals of frustration:
 - Repetition or emphasis ("I SAID", "again")
 - Short, curt responses in context of long conversation
 </task>
-
-<output>
-Respond with JSON:
-{{
-    "is_frustrated": true/false,
-    "confidence": 0.0-1.0,
-    "reasoning": "explanation..."
-}}
-</output>"""
-
+"""
         try:
-            response = self.client.chat.completions.create(
-                model=self.deployment,
-                messages=[
-                    {"role": "system", "content": "You are an expert at understanding user emotions. Always respond with valid JSON."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.1,
-                max_tokens=200,
-                response_format={"type": "json_object"}
-            )
+            result = self._call_llm_with_tools(prompt, FrustrationResult)
             
-            result_text = response.choices[0].message.content.strip()
+            if result.is_frustrated:
+                logger.info(f"😤 LLM Frustration Detected: {result.reasoning[:100]}")
             
-            if "```json" in result_text:
-                result_text = result_text.split("```json")[1].split("```")[0].strip()
-            elif "```" in result_text:
-                result_text = result_text.split("```")[1].split("```")[0].strip()
-            
-            data = json.loads(result_text)
-            
-            is_frustrated = data.get("is_frustrated", False)
-            confidence = data.get("confidence", 0.5)
-            reasoning = data.get("reasoning", "")
-            
-            if is_frustrated:
-                logger.info(f"😤 LLM Frustration Detected: {reasoning[:100]}")
-            
-            result = (is_frustrated, confidence, reasoning)
-            self._set_cached(cache_key, result)
-            return result
+            self._set_cached(cache_key, (result.is_frustrated, result.confidence, result.reasoning))
+            return (result.is_frustrated, result.confidence, result.reasoning)
             
         except Exception as e:
             logger.error(f"Error in frustration detection: {e}")
@@ -597,18 +437,7 @@ Respond with JSON:
         sources: List[Dict],
         context: str
     ) -> AnswerConfidenceResult:
-        """
-        Assess confidence in the generated answer using LLM.
-        
-        Args:
-            query: User's original query
-            answer: Generated answer
-            sources: Source documents used
-            context: Retrieved context
-            
-        Returns:
-            AnswerConfidenceResult with confidence assessment
-        """
+        """Assess confidence in the generated answer using structured output."""
         source_names = [s.get("source", "Unknown") for s in sources[:5]] if sources else ["No sources"]
         
         prompt = f"""Assess the confidence level of this answer.
@@ -637,64 +466,11 @@ Evaluate:
 
 IMPORTANT: If the answer appears truncated, incomplete, or cut off mid-sentence, mark confidence as LOW and include this in the warning_message.
 </task>
-
-<output>
-Respond with JSON:
-{{
-    "confidence_level": "high|medium|low",
-    "confidence_score": 0.0-1.0,
-    "source_quality": "excellent|good|fair|poor",
-    "has_sufficient_context": true/false,
-    "missing_info": ["list", "of", "missing"],
-    "suggested_assumptions": {{"key": "value"}},
-    "should_show_warning": true/false,
-    "warning_message": "warning if needed or null",
-    "reasoning": "explanation..."
-}}
-</output>"""
-
+"""
         try:
-            response = self.client.chat.completions.create(
-                model=self.deployment,
-                messages=[
-                    {"role": "system", "content": "You are an expert at evaluating answer quality. Always respond with valid JSON."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.1,
-                max_tokens=400,
-                response_format={"type": "json_object"}
-            )
-            
-            result_text = response.choices[0].message.content.strip()
-            
-            if "```json" in result_text:
-                result_text = result_text.split("```json")[1].split("```")[0].strip()
-            elif "```" in result_text:
-                result_text = result_text.split("```")[1].split("```")[0].strip()
-            
-            data = json.loads(result_text)
-            
-            confidence_level_str = data.get("confidence_level", "medium")
-            confidence_level = ConfidenceLevel.MEDIUM
-            if confidence_level_str == "high":
-                confidence_level = ConfidenceLevel.HIGH
-            elif confidence_level_str == "low":
-                confidence_level = ConfidenceLevel.LOW
-            
-            result = AnswerConfidenceResult(
-                confidence_level=confidence_level,
-                confidence_score=data.get("confidence_score", 0.5),
-                source_quality=data.get("source_quality", "fair"),
-                has_sufficient_context=data.get("has_sufficient_context", True),
-                missing_info=data.get("missing_info", []),
-                suggested_assumptions=data.get("suggested_assumptions", {}),
-                should_show_warning=data.get("should_show_warning", False),
-                warning_message=data.get("warning_message"),
-                reasoning=data.get("reasoning", "")
-            )
+            result = self._call_llm_with_tools(prompt, AnswerConfidenceResult)
             
             logger.info(f"📊 LLM Confidence: {result.confidence_level.value} ({result.confidence_score:.0%})")
-            
             return result
             
         except Exception as e:

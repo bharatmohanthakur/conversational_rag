@@ -213,8 +213,8 @@ def hybrid_search(
     res = client.query_points(
         collection_name=collection,
         prefetch=[
-            qm.Prefetch(query=dense_q,  using=DENSE_NAME,  limit=prefetch_k, query_filter=where),
-            qm.Prefetch(query=sparse_q, using=SPARSE_NAME, limit=prefetch_k, query_filter=where),
+            qm.Prefetch(query=dense_q,  using=DENSE_NAME,  limit=prefetch_k, filter=where),
+            qm.Prefetch(query=sparse_q, using=SPARSE_NAME, limit=prefetch_k, filter=where),
         ],
         query=qm.FusionQuery(fusion=qm.Fusion.RRF),
         limit=top_k,
@@ -593,6 +593,7 @@ def run_hybrid_search(query: str, top_k: int = TOP_K):
         print(f"{i:>2}. score={h['score']:.4f} | file={h['source_file']} | idx={h['chunk_index']}")
         print(h["preview"])
         print("-" * 80)
+    return hits
 
 # =========================
 # Main (no args)

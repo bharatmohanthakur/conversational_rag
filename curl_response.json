@@ -1,0 +1,24 @@
+Note: Unnecessary use of -X or --request, POST is already inferred.
+*   Trying 127.0.0.1:8043...
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0* Connected to localhost (127.0.0.1) port 8043 (#0)
+> POST /query_backup HTTP/1.1
+> Host: localhost:8043
+> User-Agent: curl/7.81.0
+> Accept: */*
+> Content-Type: application/json
+> Content-Length: 72
+> 
+} [72 bytes data]
+100    72    0     0  100    72      0     59  0:00:01  0:00:01 --:--:--    59100    72    0     0  100    72      0     32  0:00:02  0:00:02 --:--:--    32100    72    0     0  100    72      0     22  0:00:03  0:00:03 --:--:--    22100    72    0     0  100    72      0     17  0:00:04  0:00:04 --:--:--    17* Mark bundle as not supporting multiuse
+< HTTP/1.1 200 OK
+< date: Wed, 21 Jan 2026 17:22:23 GMT
+< server: uvicorn
+< content-length: 3391
+< content-type: application/json
+< 
+{ [3391 bytes data]
+100  3463  100  3391  100    72    726     15  0:00:04  0:00:04 --:--:--   741100  3463  100  3391  100    72    726     15  0:00:04  0:00:04 --:--:--   977
+* Connection #0 to host localhost left intact
+{"response":"<p>The Azadea remote work policy (HRD - GEN - 016 - Remote Working - P - 2) outlines the following key points:</p>\n<ul>\n<li>\n<p><strong>Applicability:</strong> The policy applies to all back-office employees whose job responsibilities do not require physical presence at the work location.</p>\n</li>\n<li>\n<p><strong>Eligibility:</strong> Employees may work remotely in situations such as:</p>\n<ul>\n<li>Illness of the employee or a direct family member, or other medical concerns</li>\n<li>Emergency travel outside the base country</li>\n<li>Inability to deliver or attend online training in a proper office venue</li>\n<li>Working during annual leaves</li>\n<li>Any other significant reason</li>\n</ul>\n</li>\n<li>\n<p><strong>Limits:</strong> Employees are eligible to work remotely for a maximum of 30 cumulative days per year, with no more than 5 days per month, unless a force majeure situation (e.g., pandemic, lockdowns, curfews) mandates otherwise.</p>\n</li>\n<li>\n<p><strong>Purpose:</strong> The policy provides standards and guidelines for remote working during crises, special situations, and emergencies, as well as regular remote work activities.</p>\n</li>\n</ul>\n<p>If you need details on procedures or how to request remote work, please let me know.</p>\n","metadata":{"request_id":"37c3ebe5","sources":[{"id":"62689e3a-30e9-4d22-a918-c5c92e8c2266","score":0.6,"source":"HRD - GEN - 016 - Remote Working - P - 2.md","text_snippet":"Eligibility\n\nBack-office employees may be eligible to work remotely if their job responsibilities do not require them to be physically\nat the work location. The policy is applicable in any of the belo","has_images":false},{"id":"2d73ad1b-7894-4a12-a46f-8e7f51cda357","score":0.5833333,"source":"HRD - GEN - 016 - Remote Working - P - 2.md","text_snippet":"# HRD - GEN - 016 - Remote Working - P - 2 — Page 1\n\n> Source file: `HRD - GEN - 016 - Remote Working - P - 2.pdf` • Page 1\n\n<figure>\n\nZADEA\n\n</figure>\n\n\n# REMOTE WORKING\n\nThe Policy covers the terms ","has_images":false},{"id":"2f43030e-7401-437b-8b29-2b0a2683260f","score":0.44444445,"source":"HRD - GEN - 016 - Remote Working - P - 2.md","text_snippet":"Eligibility\n\nBack-office employees may be eligible to work remotely if their job responsibilities do not require them to be physically\nat the work location. The policy is applicable in any of the belo","has_images":false},{"id":"2933f597-e359-45da-a982-8351f1dfff7c","score":0.41025642,"source":"HRD - GEN - 016 - Remote Working - P - 2.md","text_snippet":"# HRD - GEN - 016 - Remote Working - P - 2 — Page 1\n\n> Source file: `HRD - GEN - 016 - Remote Working - P - 2.pdf` • Page 1\n\n<figure>\n\nZADEA\n\n</figure>\n\n\n# REMOTE WORKING\n\nThe Policy covers the terms ","has_images":false},{"id":"5713fd36-076a-4d6f-a36b-6fbf7df6bc27","score":0.4,"source":"HRD - GEN - 016 - Remote Working - P - 2.md","text_snippet":"Applicability: Applicable to all Back-office Employees\n\nOwner: Chief HR Officer\n\nEffective Date: September 1, 2021\n\nRelated Documents:\n\nAzadea Code of Conduct\n\nLeave Request | HRD - GEN - 002\n\nEmploye","has_images":false}],"graphiti_facts_count":5,"memory_enabled":true,"elapsed_sec":4.667,"memory":{"types_saved":["episodic_conversation"],"episodic":{"conversation":true,"user_profile":false},"procedural":false,"semantic":true,"enabled":true}}}
