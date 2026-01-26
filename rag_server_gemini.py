@@ -4492,6 +4492,61 @@ async def query_stream_endpoint(request: QueryRequest):
         graphiti_trace = {"count": 0, "elapsed_sec": 0.0, "by_type": {}}
         graphiti_token = graphiti_trace_var.set(graphiti_trace)
 
+        # Token counter for usage tracking
+        streaming_token_count = 0
+
+        # ============================================================================
+        # Helper function to stream text while preserving newlines and formatting
+        # ============================================================================
+        async def stream_text_preserving_format(text: str, is_first: bool = True):
+            """Stream text preserving newlines, markdown formatting, and structure."""
+            nonlocal streaming_token_count
+
+            # Split by lines to preserve newlines
+            lines = text.split('\n')
+
+            for line_idx, line in enumerate(lines):
+                # Stream newline before this line (except for first line when is_first)
+                if line_idx > 0:
+                    yield f"data: {json.dumps({'type': 'token', 'text': chr(10)}, ensure_ascii=False)}\n\n"
+                    streaming_token_count += 1
+                    await asyncio.sleep(0.01)
+
+                # Handle empty lines (just the newline above is enough)
+                if not line:
+                    continue
+
+                # Split line into words
+                words = line.split(' ')
+
+                for word_idx, word in enumerate(words):
+                    # Determine the text chunk to send
+                    if word_idx == 0 and line_idx == 0 and is_first:
+                        text_chunk = word
+                    elif word_idx == 0:
+                        text_chunk = word
+                    else:
+                        text_chunk = f" {word}"
+
+                    # Skip completely empty chunks but preserve single spaces
+                    if not text_chunk:
+                        continue
+
+                    yield f"data: {json.dumps({'type': 'token', 'text': text_chunk}, ensure_ascii=False)}\n\n"
+                    streaming_token_count += 1
+
+                    # Dynamic delay for natural reading pace
+                    if word.endswith(('.', '!', '?')):
+                        await asyncio.sleep(0.05)  # Pause at sentence end
+                    elif word.endswith((',', ';', ':')):
+                        await asyncio.sleep(0.03)  # Pause at clause end
+                    elif word.startswith(('**', '#', '-', '*', '>')):
+                        await asyncio.sleep(0.02)  # Markdown formatting
+                    elif len(word) > 12:
+                        await asyncio.sleep(0.015)  # Longer words
+                    else:
+                        await asyncio.sleep(0.01)  # Normal pace
+
         try:
             query_text = request.query.strip()
             user_id = request.user_id or "default_user"
@@ -4615,21 +4670,9 @@ async def query_stream_endpoint(request: QueryRequest):
                     "query_type": "general_conversational"
                 })
 
-                # Stream word-by-word for natural delivery (like Gemini/ChatGPT/Claude)
-                words = general_response.split()
-                for i, word in enumerate(words):
-                    text_chunk = word if i == 0 else f" {word}"
-                    yield f"data: {json.dumps({'type': 'token', 'text': text_chunk}, ensure_ascii=False)}\n\n"
-
-                    # Dynamic delay for natural reading pace
-                    if word.endswith(('.', '!', '?')):
-                        await asyncio.sleep(0.08)  # Pause at sentence end
-                    elif word.endswith((',', ';', ':')):
-                        await asyncio.sleep(0.05)  # Pause at clause end
-                    elif len(word) > 12:
-                        await asyncio.sleep(0.03)  # Longer words
-                    else:
-                        await asyncio.sleep(0.02)  # Normal pace
+                # Stream with formatting preserved (newlines, markdown, etc.)
+                async for chunk in stream_text_preserving_format(general_response, is_first=True):
+                    yield chunk
 
                 # Send metadata
                 final_metadata = {
@@ -4638,14 +4681,14 @@ async def query_stream_endpoint(request: QueryRequest):
                         "request_id": request_id,
                         "query_type": "general_conversational",
                         "elapsed_sec": round(total_elapsed, 3),
-                        "words_streamed": len(words)
+                        "tokens_streamed": streaming_token_count
                     }
                 }
                 yield f"data: {json.dumps(final_metadata, ensure_ascii=False)}\n\n"
 
                 log_request(request_id, "✅ GENERAL_QUERY_STREAM_COMPLETE", {
                     "elapsed_sec": round(total_elapsed, 3),
-                    "words_streamed": len(words)
+                    "tokens_streamed": streaming_token_count
                 })
                 return
 
@@ -4987,41 +5030,74 @@ async def query_stream_endpoint(request: QueryRequest):
 
             token_count = 0  # Track tokens for usage display
 
-            # If no code blocks, use simple word-by-word streaming
-            if not code_blocks:
-                words = final_answer_with_confidence.split()
-                for i, word in enumerate(words):
-                    text_chunk = word if i == 0 else f" {word}"
-                    yield f"data: {json.dumps({'type': 'token', 'text': text_chunk}, ensure_ascii=False)}\n\n"
-                    token_count += 1
+            # Helper function to stream text while preserving newlines and formatting
+            async def stream_text_with_formatting(text: str, is_first: bool = True):
+                """Stream text preserving newlines and markdown formatting."""
+                nonlocal token_count
+                newline_char = "\n"
 
-                    # Dynamic delay for natural reading pace
-                    if word.endswith(('.', '!', '?')):
-                        await asyncio.sleep(0.08)  # Pause at sentence end
-                    elif word.endswith((',', ';', ':')):
-                        await asyncio.sleep(0.05)  # Pause at clause end
-                    elif len(word) > 12:
-                        await asyncio.sleep(0.03)  # Longer words need more time
-                    else:
-                        await asyncio.sleep(0.02)  # Normal pace
+                # Split by lines to preserve newlines
+                lines = text.split('\n')
+
+                for line_idx, line in enumerate(lines):
+                    # Stream newline before this line (except for first line)
+                    if line_idx > 0:
+                        yield f"data: {json.dumps({'type': 'token', 'text': newline_char}, ensure_ascii=False)}\n\n"
+                        token_count += 1
+                        await asyncio.sleep(0.01)
+
+                    # Handle empty lines (just the newline above is enough)
+                    if not line:
+                        continue
+
+                    # Split line into words while preserving leading/trailing spaces
+                    words = line.split(' ')
+
+                    for word_idx, word in enumerate(words):
+                        # Add space before word (except first word of first line if is_first)
+                        if word_idx > 0 or (line_idx > 0):
+                            text_chunk = f" {word}" if word else " "
+                        elif is_first and word_idx == 0 and line_idx == 0:
+                            text_chunk = word
+                        else:
+                            text_chunk = f" {word}" if word else " "
+
+                        # Skip empty chunks
+                        if not text_chunk.strip() and text_chunk != " ":
+                            if text_chunk == " ":
+                                yield f"data: {json.dumps({'type': 'token', 'text': ' '}, ensure_ascii=False)}\n\n"
+                            continue
+
+                        yield f"data: {json.dumps({'type': 'token', 'text': text_chunk}, ensure_ascii=False)}\n\n"
+                        token_count += 1
+
+                        # Dynamic delay for natural reading pace
+                        if word.endswith(('.', '!', '?')):
+                            await asyncio.sleep(0.06)  # Pause at sentence end
+                        elif word.endswith((',', ';', ':')):
+                            await asyncio.sleep(0.04)  # Pause at clause end
+                        elif word.startswith(('**', '#', '-', '*')) or word.endswith('**'):
+                            await asyncio.sleep(0.03)  # Markdown formatting
+                        elif len(word) > 12:
+                            await asyncio.sleep(0.02)  # Longer words
+                        else:
+                            await asyncio.sleep(0.015)  # Normal pace (slightly faster)
+
+            # If no code blocks, use line-aware streaming
+            if not code_blocks:
+                async for chunk in stream_text_with_formatting(final_answer_with_confidence, is_first=True):
+                    yield chunk
             else:
-                # Stream with code block detection
+                # Stream with code block detection, preserving formatting
                 last_end = 0
+                is_first_chunk = True
                 for match in code_blocks:
-                    # Stream text before code block
+                    # Stream text before code block with formatting preserved
                     text_before = final_answer_with_confidence[last_end:match.start()]
                     if text_before:
-                        words = text_before.split()
-                        for i, word in enumerate(words):
-                            text_chunk = word if i == 0 and last_end == 0 else f" {word}"
-                            yield f"data: {json.dumps({'type': 'token', 'text': text_chunk}, ensure_ascii=False)}\n\n"
-                            token_count += 1
-                            if word.endswith(('.', '!', '?')):
-                                await asyncio.sleep(0.08)
-                            elif word.endswith((',', ';', ':')):
-                                await asyncio.sleep(0.05)
-                            else:
-                                await asyncio.sleep(0.02)
+                        async for chunk in stream_text_with_formatting(text_before, is_first=is_first_chunk):
+                            yield chunk
+                        is_first_chunk = False
 
                     # Send code block metadata
                     language = match.group(1) or "plaintext"
@@ -5031,7 +5107,7 @@ async def query_stream_endpoint(request: QueryRequest):
                     yield f"data: {json.dumps({'type': 'code_block_start', 'language': language}, ensure_ascii=False)}\n\n"
                     await asyncio.sleep(0)
 
-                    # Stream code content (faster, no delays)
+                    # Stream code content preserving all formatting (newlines, indentation)
                     yield f"data: {json.dumps({'type': 'code', 'text': code_content}, ensure_ascii=False)}\n\n"
                     token_count += len(code_content.split())
                     await asyncio.sleep(0.1)  # Brief pause after code
@@ -5042,19 +5118,11 @@ async def query_stream_endpoint(request: QueryRequest):
 
                     last_end = match.end()
 
-                # Stream remaining text after last code block
+                # Stream remaining text after last code block with formatting preserved
                 text_after = final_answer_with_confidence[last_end:]
                 if text_after:
-                    words = text_after.split()
-                    for word in words:
-                        yield f"data: {json.dumps({'type': 'token', 'text': f' {word}'}, ensure_ascii=False)}\n\n"
-                        token_count += 1
-                        if word.endswith(('.', '!', '?')):
-                            await asyncio.sleep(0.08)
-                        elif word.endswith((',', ';', ':')):
-                            await asyncio.sleep(0.05)
-                        else:
-                            await asyncio.sleep(0.02)
+                    async for chunk in stream_text_with_formatting(text_after, is_first=False):
+                        yield chunk
 
             # Send comprehensive final metadata with token usage and citations
             final_metadata = {
