@@ -177,21 +177,35 @@ QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 # Use the multimodal collection with figure descriptions from GPT-4 Vision
 COLLECTION_NAME = os.getenv("QDRANT_COLLECTION", "docs_hybrid_azure_azadea_multimodal")
 
+# ---------------------------------------------------------------------
 # Initialize Clients
-# Initialize Clients
+# ---------------------------------------------------------------------
+# OpenRouter Configuration (for LLM chat completions)
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemini-2.5-flash")
 
-# Override global deployment name used throughout the app
-AZURE_CHAT_DEPLOYMENT = OPENROUTER_MODEL
-
 if not OPENROUTER_API_KEY:
-    logger.warning("OPENROUTER_API_KEY is not set. Requests will fail.")
+    logger.warning("OPENROUTER_API_KEY is not set. OpenRouter requests will fail.")
 
-aoai_client = wrap_openai(OpenAI(
+# Validate Azure credentials for embeddings (required - OpenRouter doesn't support embeddings)
+if not AZURE_OPENAI_API_KEY or not AZURE_OPENAI_ENDPOINT:
+    logger.warning("AZURE_OPENAI_API_KEY or AZURE_OPENAI_ENDPOINT is not set. Embedding operations will fail.")
+
+# OpenRouter client for LLM chat completions (wrapped with LangSmith tracing)
+openrouter_client = wrap_openai(OpenAI(
     api_key=OPENROUTER_API_KEY,
     base_url="https://openrouter.ai/api/v1",
 ))
+
+# Azure OpenAI client for embeddings (OpenRouter doesn't support embeddings)
+azure_embedding_client = AzureOpenAI(
+    api_key=AZURE_OPENAI_API_KEY,
+    azure_endpoint=AZURE_OPENAI_ENDPOINT,
+    api_version="2024-02-01",
+)
+
+# Keep aoai_client as alias to openrouter_client for backward compatibility with helper modules
+aoai_client = openrouter_client
 
 qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
 
@@ -227,23 +241,23 @@ def get_enhanced_components():
     if _conv_manager is None:
         _conv_manager = get_conversation_manager()
         _clarification_tracker = ClarificationTracker(_conv_manager)
-        _conversation_summarizer = ConversationSummarizer(aoai_client, deployment_name=AZURE_CHAT_DEPLOYMENT)
+        _conversation_summarizer = ConversationSummarizer(aoai_client, deployment_name=OPENROUTER_MODEL)
         _self_evaluator = SelfEvaluator(aoai_client)
         _quality_gate = AnswerQualityGate(_self_evaluator)
         # Initialize RAG technique modules
-        _contextual_compressor = ContextualCompressor(aoai_client, deployment_name=AZURE_CHAT_DEPLOYMENT)
+        _contextual_compressor = ContextualCompressor(aoai_client, deployment_name=OPENROUTER_MODEL)
         # Set top_k to 10 to return all reranked docs (we limit input to 10, then take top 7 after)
-        _reranker = Reranker(aoai_client, deployment_name=AZURE_CHAT_DEPLOYMENT, top_k=10)
-        _corrective_rag = CorrectiveRAG(aoai_client, deployment_name=AZURE_CHAT_DEPLOYMENT)
+        _reranker = Reranker(aoai_client, deployment_name=OPENROUTER_MODEL, top_k=10)
+        _corrective_rag = CorrectiveRAG(aoai_client, deployment_name=OPENROUTER_MODEL)
         # Initialize general query handler for conversational queries
         _general_query_handler = GeneralQueryHandler(
             llm_client=aoai_client,
-            deployment_name=AZURE_CHAT_DEPLOYMENT
+            deployment_name=OPENROUTER_MODEL
         )
         # Initialize conversational excellence for natural responses
         _conversational_excellence = ConversationalExcellence(
             llm_client=aoai_client,
-            deployment_name=AZURE_CHAT_DEPLOYMENT,
+            deployment_name=OPENROUTER_MODEL,
             personality="warm_professional"
         )
         # Initialize adaptive retriever with run_search_for_deep_agent as retrieval function
@@ -255,9 +269,9 @@ def get_enhanced_components():
         # 1. Initialize global singletons (query_cache, query_processor)
         # Note: pattern_matcher auto-initializes through get_pattern_matcher()
 
-        # Simple embedding function for cache (using Azure OpenAI)
+        # Simple embedding function for cache (using Azure OpenAI - OpenRouter doesn't support embeddings)
         def embed_query(text: str):
-            response = aoai_client.embeddings.create(
+            response = azure_embedding_client.embeddings.create(
                 model=AZURE_EMBEDDING_DEPLOYMENT,
                 input=text
             )
@@ -272,13 +286,13 @@ def get_enhanced_components():
 
         init_query_processor(
             llm_client=aoai_client,
-            deployment_name=AZURE_CHAT_DEPLOYMENT
+            deployment_name=OPENROUTER_MODEL
         )
 
         # 2. Initialize optimization components
         _best_guess_answering = BestGuessAnswering(
             llm_client=aoai_client,
-            deployment_name=AZURE_CHAT_DEPLOYMENT
+            deployment_name=OPENROUTER_MODEL
         )
 
         _user_profile_tracker = UserProfileTracker(
@@ -293,16 +307,16 @@ def get_enhanced_components():
 
         _unified_clarification_handler = ClarificationHandler(
             llm_client=aoai_client,
-            deployment_name=AZURE_CHAT_DEPLOYMENT,
+            deployment_name=OPENROUTER_MODEL,
             clarification_tracker=_clarification_tracker
         )
 
         # Initialize LLM Context Classifier with CoT reasoning
-        init_llm_context_classifier(aoai_client, AZURE_CHAT_DEPLOYMENT)
+        init_llm_context_classifier(aoai_client, OPENROUTER_MODEL)
         _llm_context_classifier = get_llm_context_classifier()
 
         # Initialize comprehensive LLM Classifier (zero hardcoding)
-        init_llm_classifier(aoai_client, AZURE_CHAT_DEPLOYMENT, cache_enabled=True)
+        init_llm_classifier(aoai_client, OPENROUTER_MODEL, cache_enabled=True)
         _llm_classifier = get_llm_classifier()
 
     return (_conv_manager, _clarification_tracker, _conversation_summarizer, _self_evaluator,
@@ -343,30 +357,14 @@ async def get_graphiti() -> Optional[Graphiti]:
             
         try:
             print("🔄 Initializing Graphiti memory system...")
-            
-            # Azure OpenAI clients for Graphiti
-            llm_client_v1 = AsyncOpenAI(
-                api_key=AZURE_OPENAI_API_KEY,
-                base_url=f"{AZURE_OPENAI_ENDPOINT}openai/v1/",
-            )
-            
-            llm_client_azure = AsyncAzureOpenAI(
+
+            # Azure OpenAI async client for embeddings (OpenRouter doesn't support embeddings)
+            async_azure_embedding_client = AsyncAzureOpenAI(
                 api_key=AZURE_OPENAI_API_KEY,
                 api_version=AZURE_OPENAI_API_VERSION,
                 azure_endpoint=AZURE_OPENAI_ENDPOINT,
             )
-            
-            embedding_client_azure = AsyncAzureOpenAI(
-                api_key=AZURE_OPENAI_API_KEY,
-                api_version=AZURE_OPENAI_API_VERSION,
-                azure_endpoint=AZURE_OPENAI_ENDPOINT,
-            )
-            
-            azure_llm_config = LLMConfig(
-                model=AZURE_CHAT_DEPLOYMENT,
-                small_model=AZURE_CHAT_DEPLOYMENT,
-            )
-            
+
             # Create Neo4j driver with custom database name
             neo4j_driver = Neo4jDriver(
                 uri=NEO4J_URI,
@@ -375,35 +373,39 @@ async def get_graphiti() -> Optional[Graphiti]:
                 database=NEO4J_DATABASE,
             )
             logger.info(f"🔗 Connecting to Neo4j: {NEO4J_URI} (database: {NEO4J_DATABASE})")
-            
-            # Use custom driver with OpenAIClient (configured for OpenRouter)
-            # Create a dedicated client for Graphiti LLM interactions
-            graphiti_llm_client = AsyncOpenAI(
+
+            # OpenRouter async client for LLM operations (chat, reranking)
+            async_openrouter_client = AsyncOpenAI(
                 api_key=OPENROUTER_API_KEY,
                 base_url="https://openrouter.ai/api/v1",
             )
-            
+
+            # LLM config for OpenRouter model
+            openrouter_llm_config = LLMConfig(
+                model=OPENROUTER_MODEL,
+                small_model=OPENROUTER_MODEL,
+            )
+
             graphiti_instance = Graphiti(
                 graph_driver=neo4j_driver,
+                # LLM client uses OpenRouter for chat completions
                 llm_client=OpenAIClient(
-                    client=graphiti_llm_client,
-                    config=LLMConfig(
-                        model=OPENROUTER_MODEL,
-                        # Use a smaller/cheaper model for lighter tasks if needed, or same model
-                        small_model=OPENROUTER_MODEL,
-                    ),
+                    client=async_openrouter_client,
+                    config=openrouter_llm_config,
                     reasoning=None,
                     verbosity=None,
                 ),
+                # Embedder uses Azure OpenAI (OpenRouter doesn't support embeddings)
                 embedder=OpenAIEmbedder(
                     config=OpenAIEmbedderConfig(
                         embedding_model=AZURE_EMBEDDING_DEPLOYMENT
                     ),
-                    client=embedding_client_azure,
+                    client=async_azure_embedding_client,
                 ),
+                # Cross encoder/reranker uses OpenRouter for LLM-based reranking
                 cross_encoder=OpenAIRerankerClient(
-                    config=LLMConfig(model=azure_llm_config.small_model),
-                    client=llm_client_azure,
+                    config=openrouter_llm_config,
+                    client=async_openrouter_client,
                 ),
             )
             
@@ -1258,7 +1260,7 @@ Standalone Question:"""
 
     try:
         response = aoai_client.chat.completions.create(
-            model=AZURE_CHAT_DEPLOYMENT,
+            model=OPENROUTER_MODEL,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.0,
             max_tokens=200
@@ -1454,7 +1456,7 @@ async def query_backup_endpoint(request: QueryRequest):
             messages.append({"role": "user", "content": f"Context:\n{combined_context}\n\nQuestion: {query_text}"})
         
         completion = aoai_client.chat.completions.create(
-            model=AZURE_CHAT_DEPLOYMENT,
+            model=OPENROUTER_MODEL,
             messages=messages,
             temperature=0.0,
             max_tokens=10000,  # Increased to prevent answer truncation and ensure completeness
@@ -1466,7 +1468,7 @@ async def query_backup_endpoint(request: QueryRequest):
         log_request(request_id, "💬 LLM_RESPONSE", {
             "answer_chars": len(answer_text),
             "elapsed_sec": round(llm_elapsed, 3),
-            "model": AZURE_CHAT_DEPLOYMENT,
+            "model": OPENROUTER_MODEL,
             "multimodal": len(retrieved_images) > 0
         })
         
