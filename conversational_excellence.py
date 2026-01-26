@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 import logging
 from datetime import datetime
-from openai import AzureOpenAI
+from openai import AzureOpenAI, OpenAI
 import json
 import re
 
