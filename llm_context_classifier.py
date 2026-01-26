@@ -8,7 +8,7 @@ import logging
 import json
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
-from openai import AzureOpenAI
+from openai import AzureOpenAI, OpenAI
 import os
 
 logger = logging.getLogger("LLMContextClassifier")

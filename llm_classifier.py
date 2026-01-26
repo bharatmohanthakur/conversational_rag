@@ -8,7 +8,7 @@ import logging
 import json
 from typing import Dict, Any, Optional, List, Tuple, Type, Union
 from enum import Enum
-from openai import OpenAI
+from openai import OpenAI, AzureOpenAI
 import hashlib
 from datetime import datetime, timedelta
 from pydantic import BaseModel, Field
