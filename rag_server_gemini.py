@@ -207,6 +207,136 @@ aoai_client = openrouter_client
 
 qdrant_client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
 
+# ---------------------------------------------------------------------
+# Token Usage & Cost Tracking
+# ---------------------------------------------------------------------
+# OpenRouter model pricing (per 1M tokens) - Updated Jan 2025
+# See: https://openrouter.ai/models for latest pricing
+MODEL_PRICING = {
+    # Google Models
+    "google/gemini-2.5-flash": {"input": 0.075, "output": 0.30},
+    "google/gemini-2.5-flash-preview": {"input": 0.075, "output": 0.30},
+    "google/gemini-2.0-flash": {"input": 0.10, "output": 0.40},
+    "google/gemini-pro": {"input": 0.125, "output": 0.375},
+    "google/gemini-pro-1.5": {"input": 1.25, "output": 5.00},
+    # Anthropic Models
+    "anthropic/claude-3.5-sonnet": {"input": 3.00, "output": 15.00},
+    "anthropic/claude-3-sonnet": {"input": 3.00, "output": 15.00},
+    "anthropic/claude-3-haiku": {"input": 0.25, "output": 1.25},
+    "anthropic/claude-3-opus": {"input": 15.00, "output": 75.00},
+    # OpenAI Models
+    "openai/gpt-4o": {"input": 2.50, "output": 10.00},
+    "openai/gpt-4o-mini": {"input": 0.15, "output": 0.60},
+    "openai/gpt-4-turbo": {"input": 10.00, "output": 30.00},
+    "openai/gpt-3.5-turbo": {"input": 0.50, "output": 1.50},
+    # Meta Models
+    "meta-llama/llama-3.1-70b-instruct": {"input": 0.35, "output": 0.40},
+    "meta-llama/llama-3.1-8b-instruct": {"input": 0.055, "output": 0.055},
+    # Mistral Models
+    "mistralai/mistral-large": {"input": 2.00, "output": 6.00},
+    "mistralai/mistral-medium": {"input": 2.70, "output": 8.10},
+    "mistralai/mistral-small": {"input": 0.20, "output": 0.60},
+    # Default fallback pricing (conservative estimate)
+    "default": {"input": 1.00, "output": 3.00},
+}
+
+# Embedding model pricing (Azure OpenAI)
+EMBEDDING_PRICING = {
+    "text-embedding-3-small": {"input": 0.02},  # per 1M tokens
+    "text-embedding-3-large": {"input": 0.13},
+    "text-embedding-ada-002": {"input": 0.10},
+    "default": {"input": 0.10},
+}
+
+def count_tokens(text: str, method: str = "approximate") -> int:
+    """
+    Count tokens in text.
+
+    Args:
+        text: Text to count tokens for
+        method: "approximate" (fast, ~4 chars/token) or "tiktoken" (accurate, requires tiktoken)
+
+    Returns:
+        Estimated token count
+    """
+    if not text:
+        return 0
+
+    if method == "tiktoken":
+        try:
+            import tiktoken
+            # Use cl100k_base encoding (used by GPT-4, Claude, etc.)
+            enc = tiktoken.get_encoding("cl100k_base")
+            return len(enc.encode(text))
+        except ImportError:
+            # Fall back to approximate if tiktoken not installed
+            pass
+
+    # Approximate method: ~4 characters per token (industry standard approximation)
+    # Also account for whitespace and punctuation
+    return max(1, len(text) // 4)
+
+def calculate_cost(
+    input_tokens: int,
+    output_tokens: int,
+    model: str = None,
+    embedding_tokens: int = 0,
+    embedding_model: str = None
+) -> dict:
+    """
+    Calculate cost for a query based on token usage.
+
+    Args:
+        input_tokens: Number of input/prompt tokens
+        output_tokens: Number of output/completion tokens
+        model: Model name (defaults to OPENROUTER_MODEL)
+        embedding_tokens: Number of tokens used for embeddings
+        embedding_model: Embedding model name
+
+    Returns:
+        Dict with cost breakdown
+    """
+    model = model or OPENROUTER_MODEL
+    embedding_model = embedding_model or AZURE_EMBEDDING_DEPLOYMENT
+
+    # Get pricing for the model
+    pricing = MODEL_PRICING.get(model, MODEL_PRICING["default"])
+    embed_pricing = EMBEDDING_PRICING.get(embedding_model, EMBEDDING_PRICING["default"])
+
+    # Calculate costs (pricing is per 1M tokens)
+    input_cost = (input_tokens / 1_000_000) * pricing["input"]
+    output_cost = (output_tokens / 1_000_000) * pricing["output"]
+    embedding_cost = (embedding_tokens / 1_000_000) * embed_pricing["input"]
+
+    total_cost = input_cost + output_cost + embedding_cost
+
+    return {
+        "model": model,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "embedding_tokens": embedding_tokens,
+        "total_tokens": input_tokens + output_tokens + embedding_tokens,
+        "costs": {
+            "input_cost_usd": round(input_cost, 6),
+            "output_cost_usd": round(output_cost, 6),
+            "embedding_cost_usd": round(embedding_cost, 6),
+            "total_cost_usd": round(total_cost, 6),
+        },
+        "pricing_per_1m": {
+            "input": pricing["input"],
+            "output": pricing["output"],
+        }
+    }
+
+def estimate_context_tokens(sources: list, max_per_source: int = 500) -> int:
+    """Estimate tokens used in context from retrieved sources."""
+    total = 0
+    for source in sources[:10]:  # Max 10 sources
+        text = source.get("text", "") or source.get("content", "")
+        # Limit per source to avoid over-counting
+        total += min(count_tokens(text[:max_per_source * 4]), max_per_source)
+    return total
+
 # Initialize enhanced components (will be used later)
 _conv_manager = None
 _clarification_tracker = None
@@ -4383,11 +4513,23 @@ async def query_endpoint(request: QueryRequest):
         is_procedural_query = any(keyword in query_text.lower() for keyword in ['how to', 'steps', 'process', 'procedure'])
         has_high_confidence = confidence_result and confidence_result.confidence_level.value == "high"
 
+        # Calculate token usage and cost
+        input_tokens = count_tokens(query_text)
+        context_tokens = estimate_context_tokens(sources)
+        output_tokens = count_tokens(final_answer_with_confidence)
+        embedding_tokens = count_tokens(query_text) * 2  # Query embedding + reranking
+        total_input_tokens = input_tokens + context_tokens
+        cost_info = calculate_cost(
+            input_tokens=total_input_tokens,
+            output_tokens=output_tokens,
+            embedding_tokens=embedding_tokens
+        )
+
         metadata = {
-                "request_id": request_id,
-                "agent": "LangGraph Decomposition",
-                "complexity": complexity,
-                "sub_queries": result.get("sub_queries", []),
+            "request_id": request_id,
+            "agent": "LangGraph Decomposition",
+            "complexity": complexity,
+            "sub_queries": result.get("sub_queries", []),
             "sources": sources,
             "elapsed_sec": round(total_elapsed, 3),
             "quality": {
@@ -4398,8 +4540,17 @@ async def query_endpoint(request: QueryRequest):
                 "should_show_warning": confidence_result.should_show_warning if confidence_result else False,
                 "warning_message": confidence_result.warning_message if confidence_result else None
             },
+            "usage": {
+                "input_tokens": input_tokens,
+                "context_tokens": context_tokens,
+                "output_tokens": output_tokens,
+                "embedding_tokens": embedding_tokens,
+                "total_tokens": total_input_tokens + output_tokens + embedding_tokens,
+            },
+            "cost": cost_info["costs"],
+            "model": OPENROUTER_MODEL,
             "memory": {
-                "types_saved": ["episodic_conversation"],  # Will include: user_profile, procedural, semantic
+                "types_saved": ["episodic_conversation"],
                 "episodic": {"conversation": True, "user_profile": bool(user_profile)},
                 "procedural": is_procedural_query and any(marker in answer_text for marker in ['Step 1', 'Step 2', '1.', '2.']),
                 "semantic": bool(sources and has_high_confidence),
@@ -4674,21 +4825,34 @@ async def query_stream_endpoint(request: QueryRequest):
                 async for chunk in stream_text_preserving_format(general_response, is_first=True):
                     yield chunk
 
-                # Send metadata
+                # Calculate token usage and cost for general query
+                input_tokens = count_tokens(query_text)
+                output_tokens = count_tokens(general_response)
+                cost_info = calculate_cost(input_tokens, output_tokens)
+
+                # Send metadata with token usage and cost
                 final_metadata = {
                     "type": "done",
                     "metadata": {
                         "request_id": request_id,
                         "query_type": "general_conversational",
                         "elapsed_sec": round(total_elapsed, 3),
-                        "tokens_streamed": streaming_token_count
+                        "tokens_streamed": streaming_token_count,
+                        "usage": {
+                            "input_tokens": input_tokens,
+                            "output_tokens": output_tokens,
+                            "total_tokens": input_tokens + output_tokens,
+                        },
+                        "cost": cost_info["costs"],
+                        "model": OPENROUTER_MODEL,
                     }
                 }
                 yield f"data: {json.dumps(final_metadata, ensure_ascii=False)}\n\n"
 
                 log_request(request_id, "✅ GENERAL_QUERY_STREAM_COMPLETE", {
                     "elapsed_sec": round(total_elapsed, 3),
-                    "tokens_streamed": streaming_token_count
+                    "tokens_streamed": streaming_token_count,
+                    "cost_usd": cost_info["costs"]["total_cost_usd"]
                 })
                 return
 
@@ -5124,7 +5288,21 @@ async def query_stream_endpoint(request: QueryRequest):
                     async for chunk in stream_text_with_formatting(text_after, is_first=False):
                         yield chunk
 
-            # Send comprehensive final metadata with token usage and citations
+            # Calculate comprehensive token usage and cost
+            input_tokens = count_tokens(query_text)
+            context_tokens = estimate_context_tokens(sources)
+            output_tokens = count_tokens(final_answer_with_confidence)
+            # Estimate embedding tokens (query + reranking)
+            embedding_tokens = count_tokens(query_text) * 2  # Query embedded + reranking
+
+            total_input_tokens = input_tokens + context_tokens
+            cost_info = calculate_cost(
+                input_tokens=total_input_tokens,
+                output_tokens=output_tokens,
+                embedding_tokens=embedding_tokens
+            )
+
+            # Send comprehensive final metadata with token usage, cost, and citations
             final_metadata = {
                 "type": "done",
                 "metadata": {
@@ -5143,14 +5321,19 @@ async def query_stream_endpoint(request: QueryRequest):
                         "warning_message": confidence_result.warning_message if confidence_result else None
                     },
                     "enhancements": enhancement.improvements_made,
-                    "token_usage": {
+                    "usage": {
+                        "input_tokens": input_tokens,
+                        "context_tokens": context_tokens,
+                        "output_tokens": output_tokens,
+                        "embedding_tokens": embedding_tokens,
+                        "total_tokens": total_input_tokens + output_tokens + embedding_tokens,
                         "tokens_streamed": token_count,
-                        "estimated_input_tokens": len(query_text.split()) + sum(len(s.get("text", "").split()) for s in sources[:5]),
-                        "estimated_total_tokens": token_count + len(query_text.split())
                     },
+                    "cost": cost_info["costs"],
+                    "model": OPENROUTER_MODEL,
                     "citations": citation_map if citation_map else {},
                     "memory": {
-                        "types_saved": ["episodic_conversation"],  # Will include: user_profile, procedural, semantic
+                        "types_saved": ["episodic_conversation"],
                         "episodic": {"conversation": True, "user_profile": bool(user_profile)},
                         "procedural": any(keyword in query_text.lower() for keyword in ['how to', 'steps', 'process', 'procedure']),
                         "semantic": bool(sources and confidence_result and confidence_result.confidence_level.value == "high"),
@@ -5163,7 +5346,9 @@ async def query_stream_endpoint(request: QueryRequest):
             log_request(request_id, "🤖 STREAM_END", {
                 "elapsed_sec": round(total_elapsed, 3),
                 "complexity": complexity,
-                "tokens_streamed": token_count
+                "tokens_streamed": token_count,
+                "total_tokens": cost_info["total_tokens"],
+                "cost_usd": cost_info["costs"]["total_cost_usd"]
             })
 
         except Exception as e:
